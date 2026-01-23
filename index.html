@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Mapa de Asientos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- SUPABASE CDN -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="layout">
+
+  <section class="seats">
+    <div id="avion" class="grid"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Asiento <span id="seatLabel">—</span></h2>
+
+    <label>Nombre</label><input id="nombre">
+    <label>Documento</label><input id="documento">
+    <label>Teléfono</label><input id="telefono">
+    <label>Email</label><input id="email">
+
+    <hr>
+
+    <label>Vendedor</label><input id="vendedor">
+    <label>Precio</label><input id="precio" type="number">
+    <label>Moneda</label>
+    <select id="moneda">
+      <option>USD</option>
+      <option>PAB</option>
+      <option>EUR</option>
+    </select>
+
+    <label>Forma de pago</label>
+    <select id="formaPago">
+      <option>TC</option>
+      <option>Transferencia</option>
+      <option>Efectivo</option>
+      <option>Mixto</option>
+    </select>
+
+    <label>Estado de pago</label>
+    <select id="estadoPago">
+      <option value="libre">LIBRE</option>
+      <option value="pendiente">PENDIENTE</option>
+      <option value="abono">ABONO</option>
+      <option value="pagado">PAGADO</option>
+    </select>
+
+    <label>Fecha de pago</label><input id="fechaPago" type="date">
+    <label>Observaciones</label><input id="observaciones">
+
+    <div class="actions">
+      <button id="btnGuardar" class="btn primary">💾 Guardar</button>
+      <button id="btnLiberar" class="btn danger">🗑 Liberar</button>
+    </div>
+
+    <div class="actions">
+      <button id="btnExportar" class="btn primary">⬇ Exportar CSV</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

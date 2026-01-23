@@ -1,0 +1,235 @@
+:root{
+  --bg:#020617;
+  --card:#0f172a;
+  --border:#1f2937;
+  --text:#e5e7eb;
+  --muted:#9ca3af;
+
+  --libre:#22c55e;
+  --pendiente:#f59e0b;
+  --abono:#a855f7;
+  --pagado:#3b82f6;
+}
+
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: radial-gradient(circle at top, #020617, #000);
+  color:var(--text);
+  height:100vh;
+}
+
+/* =======================
+   LAYOUT
+======================= */
+.layout{
+  display:grid;
+  grid-template-columns: 2.2fr 1fr;
+  height:100vh;
+}
+
+/* =======================
+   AVIÓN / ASIENTOS
+======================= */
+.seats{
+  overflow:auto;
+}
+
+.grid{
+  padding:24px;
+  display:grid;
+  grid-template-columns: repeat(3, 1fr) 64px repeat(3, 1fr);
+  gap:16px;
+}
+
+.pasillo{
+  pointer-events:none;
+}
+
+/* =======================
+   ASIENTO
+======================= */
+.asiento{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.3));
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:14px;
+  min-height:110px;
+  cursor:pointer;
+  transition: all .2s ease;
+  backdrop-filter: blur(6px);
+}
+
+.asiento:hover{
+  transform:translateY(-3px) scale(1.02);
+  border-color:#38bdf8;
+}
+
+.asiento.seleccionado{
+  outline:2px solid #22d3ee;
+  outline-offset:2px;
+}
+
+/* =======================
+   CONTENIDO ASIENTO
+======================= */
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:12px;
+  font-weight:600;
+  color:#cbd5f5;
+}
+
+.top span{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  display:inline-block;
+}
+
+.name{
+  margin-top:16px;
+  font-size:14px;
+  font-weight:500;
+  color:#e5e7eb;
+  line-height:1.3;
+  word-break:break-word;
+}
+
+/* =======================
+   ESTADOS
+======================= */
+.asiento.libre .dot{ background:var(--libre); }
+.asiento.pendiente .dot{ background:var(--pendiente); }
+.asiento.abono .dot{ background:var(--abono); }
+.asiento.pagado .dot{ background:var(--pagado); }
+
+.asiento.libre{ box-shadow:0 0 0 1px rgba(34,197,94,.15); }
+.asiento.pendiente{ box-shadow:0 0 0 1px rgba(245,158,11,.25); }
+.asiento.abono{ box-shadow:0 0 0 1px rgba(168,85,247,.25); }
+.asiento.pagado{ box-shadow:0 0 0 1px rgba(59,130,246,.25); }
+
+/* =======================
+   PANEL DERECHO
+======================= */
+.panel{
+  padding:24px;
+  border-left:1px solid var(--border);
+  background:linear-gradient(180deg, #020617, #000);
+  overflow:auto;
+}
+
+.panel h2{
+  margin:0 0 10px;
+  font-size:20px;
+}
+
+.panel h2 span{
+  color:#38bdf8;
+}
+
+/* =======================
+   FORMULARIO
+======================= */
+label{
+  display:block;
+  margin-top:14px;
+  font-size:12px;
+  color:var(--muted);
+}
+
+input,
+select{
+  width:100%;
+  padding:12px 14px;
+  margin-top:4px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:#020617;
+  color:var(--text);
+  font-size:14px;
+  outline:none;
+}
+
+input:focus,
+select:focus{
+  border-color:#38bdf8;
+  box-shadow:0 0 0 1px rgba(56,189,248,.3);
+}
+
+hr{
+  border:none;
+  border-top:1px solid var(--border);
+  margin:20px 0;
+}
+
+/* =======================
+   BOTONES
+======================= */
+.actions{
+  display:flex;
+  gap:12px;
+  margin-top:22px;
+}
+
+.btn{
+  flex:1;
+  padding:14px;
+  border-radius:16px;
+  border:none;
+  font-weight:600;
+  font-size:14px;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.btn.primary{
+  background:linear-gradient(135deg,#3b82f6,#06b6d4);
+  color:white;
+}
+
+.btn.primary:hover{
+  filter:brightness(1.1);
+  transform:translateY(-1px);
+}
+
+.btn.danger{
+  background:#020617;
+  border:1px solid #374151;
+  color:#f87171;
+}
+
+.btn.danger:hover{
+  background:#111827;
+}
+
+/* =======================
+   RESPONSIVE
+======================= */
+@media(max-width:1100px){
+  .layout{
+    grid-template-columns:1fr;
+  }
+
+  .panel{
+    border-left:none;
+    border-top:1px solid var(--border);
+  }
+
+  .grid{
+    grid-template-columns: repeat(3, 1fr) 48px repeat(3, 1fr);
+  }
+}
