@@ -1,68 +1,144 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Mapa de Asientos</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- SUPABASE CDN -->
+  <!-- Supabase SDK (NO module) -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-<div class="layout">
+<!-- LOGIN FULLSCREEN -->
+<section id="loginScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-title">Mapa de Asientos</div>
+      <div class="auth-subtitle">Acceso para vendedor</div>
+    </div>
 
+    <label class="auth-label">Email</label>
+    <input id="loginEmail" class="auth-input" placeholder="correo@empresa.com" autocomplete="username" />
+
+    <label class="auth-label">Contraseña</label>
+    <input id="loginPass" class="auth-input" type="password" placeholder="••••••••" autocomplete="current-password" />
+
+    <button id="btnLogin" class="btn primary full">Entrar</button>
+
+    <div id="authError" class="auth-error" style="display:none;"></div>
+
+    <div class="auth-foot">
+      <span id="authHint">Usa tu usuario creado en Supabase → Authentication → Users</span>
+    </div>
+  </div>
+</section>
+
+<!-- APP -->
+<div id="app" class="layout" style="display:none;">
+
+  <!-- MAPA -->
   <section class="seats">
+    <header class="topbar">
+      <div class="brand">
+        <div class="title">Mapa de Asientos</div>
+        <div class="subtitle">170 puestos · avión 3–3</div>
+      </div>
+
+      <div class="top-actions">
+        <button id="btnLogout" class="btn danger">Salir</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span id="cLibre">0</span><small>Libres</small></div>
+        <div class="stat"><span id="cPend">0</span><small>Pend.</small></div>
+        <div class="stat"><span id="cAbono">0</span><small>Abono</small></div>
+        <div class="stat"><span id="cPag">0</span><small>Pagado</small></div>
+      </div>
+
+      <div class="controls">
+        <input id="search" class="search" placeholder="Buscar pasajero / documento / email…" />
+        <div class="filters">
+          <button class="chip active" data-filter="todos">Todos</button>
+          <button class="chip" data-filter="libre">Libre</button>
+          <button class="chip" data-filter="pendiente">Pendiente</button>
+          <button class="chip" data-filter="abono">Abono</button>
+          <button class="chip" data-filter="pagado">Pagado</button>
+        </div>
+      </div>
+    </header>
+
     <div id="avion" class="grid"></div>
   </section>
 
+  <!-- PANEL -->
   <section class="panel">
-    <h2>Asiento <span id="seatLabel">—</span></h2>
-
-    <label>Nombre</label><input id="nombre">
-    <label>Documento</label><input id="documento">
-    <label>Teléfono</label><input id="telefono">
-    <label>Email</label><input id="email">
-
-    <hr>
-
-    <label>Vendedor</label><input id="vendedor">
-    <label>Precio</label><input id="precio" type="number">
-    <label>Moneda</label>
-    <select id="moneda">
-      <option>USD</option>
-      <option>PAB</option>
-      <option>EUR</option>
-    </select>
-
-    <label>Forma de pago</label>
-    <select id="formaPago">
-      <option>TC</option>
-      <option>Transferencia</option>
-      <option>Efectivo</option>
-      <option>Mixto</option>
-    </select>
-
-    <label>Estado de pago</label>
-    <select id="estadoPago">
-      <option value="libre">LIBRE</option>
-      <option value="pendiente">PENDIENTE</option>
-      <option value="abono">ABONO</option>
-      <option value="pagado">PAGADO</option>
-    </select>
-
-    <label>Fecha de pago</label><input id="fechaPago" type="date">
-    <label>Observaciones</label><input id="observaciones">
-
-    <div class="actions">
-      <button id="btnGuardar" class="btn primary">💾 Guardar</button>
-      <button id="btnLiberar" class="btn danger">🗑 Liberar</button>
+    <div class="panel-head">
+      <h2>Asiento <span id="seatLabel">—</span></h2>
+      <button id="btnNuevo" class="btn ghost">➕ Nuevo</button>
     </div>
 
-    <div class="actions">
-      <button id="btnExportar" class="btn primary">⬇ Exportar CSV</button>
+    <div class="panel-body">
+      <label>Nombre del pasajero</label>
+      <input id="nombre" autocomplete="off" />
+
+      <label>Documento / Pasaporte</label>
+      <input id="documento" autocomplete="off" />
+
+      <label>Teléfono</label>
+      <input id="telefono" autocomplete="off" />
+
+      <label>Email</label>
+      <input id="email" autocomplete="off" />
+
+      <hr />
+
+      <label>Vendedor</label>
+      <input id="vendedor" autocomplete="off" />
+
+      <label>Precio</label>
+      <input id="precio" type="number" inputmode="decimal" />
+
+      <label>Moneda</label>
+      <select id="moneda">
+        <option>USD</option>
+        <option>PAB</option>
+        <option>EUR</option>
+      </select>
+
+      <label>Forma de pago</label>
+      <select id="formaPago">
+        <option>TC</option>
+        <option>Transferencia</option>
+        <option>Efectivo</option>
+        <option>Mixto</option>
+      </select>
+
+      <label>Estado de pago</label>
+      <select id="estadoPago">
+        <option value="libre">LIBRE</option>
+        <option value="pendiente">PENDIENTE</option>
+        <option value="abono">ABONO</option>
+        <option value="pagado">PAGADO</option>
+      </select>
+
+      <label>Fecha de pago</label>
+      <!-- guardamos como texto para evitar problemas de formato -->
+      <input id="fechaPago" placeholder="YYYY-MM-DD (o texto)" />
+
+      <label>Observaciones</label>
+      <input id="observaciones" autocomplete="off" />
+
+      <div class="actions">
+        <button id="btnGuardar" class="btn primary">💾 Guardar</button>
+        <button id="btnLiberar" class="btn danger">🗑 Liberar</button>
+      </div>
+
+      <button id="btnCSV" class="btn export">⬇ Exportar CSV</button>
+
+      <p class="hint" id="hintSelect">Selecciona un asiento para editar y guardar.</p>
     </div>
   </section>
 

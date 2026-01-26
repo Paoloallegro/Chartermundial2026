@@ -1,25 +1,44 @@
 /* =====================
-   SUPABASE (UNA SOLA VEZ)
+   SUPABASE (cambia aquí)
 ===================== */
-const SUPABASE_URL = "https://wzmucdhsjbfxjbxvzlxo.supabase.co"; 
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";                 
-
-if (!window.supabase) {
-  alert("No se cargó el SDK de Supabase. Revisa que el <script> de supabase-js esté antes de script.js");
-}
+const SUPABASE_URL = "https://TU-PROYECTO.supabase.co"; // <-- cambia
+const SUPABASE_ANON = "TU-ANON-PUBLIC";                 // <-- cambia
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /* =====================
-   ELEMENTOS UI
+   UI refs
 ===================== */
-const avion = document.getElementById("avion") || document.getElementById("asientos");
+const loginScreen = document.getElementById("loginScreen");
+const app = document.getElementById("app");
+
+const loginEmail = document.getElementById("loginEmail");
+const loginPass = document.getElementById("loginPass");
+const btnLogin = document.getElementById("btnLogin");
+const btnLogout = document.getElementById("btnLogout");
+const authError = document.getElementById("authError");
+
+const avion = document.getElementById("avion");
 const seatLabel = document.getElementById("seatLabel");
+const hintSelect = document.getElementById("hintSelect");
+
+const searchInput = document.getElementById("search");
+const chips = Array.from(document.querySelectorAll(".chip"));
+
+const cLibre = document.getElementById("cLibre");
+const cPend  = document.getElementById("cPend");
+const cAbono = document.getElementById("cAbono");
+const cPag   = document.getElementById("cPag");
+
+const btnNuevo = document.getElementById("btnNuevo");
+const btnGuardar = document.getElementById("btnGuardar");
+const btnLiberar = document.getElementById("btnLiberar");
+const btnCSV = document.getElementById("btnCSV");
 
 const fields = [
-  "nombre", "documento", "telefono", "email",
-  "vendedor", "precio", "moneda",
-  "formaPago", "estadoPago", "fechaPago", "observaciones"
+  "nombre","documento","telefono","email",
+  "vendedor","precio","moneda",
+  "formaPago","estadoPago","fechaPago","observaciones"
 ];
 
 const TOTAL_ASIENTOS = 170;
@@ -27,9 +46,29 @@ const columnas = ["A","B","C","D","E","F"];
 
 let seleccionado = null;
 let data = {};
+let filterEstado = "todos";
+let searchText = "";
 
 /* =====================
-   HELPERS
+   Auth UI
+===================== */
+function showError(msg){
+  authError.style.display = msg ? "block" : "none";
+  authError.textContent = msg || "";
+}
+
+function setMode(logged){
+  loginScreen.style.display = logged ? "none" : "flex";
+  app.style.display = logged ? "grid" : "none";
+}
+
+async function requireSession(){
+  const { data: s } = await db.auth.getSession();
+  return s.session;
+}
+
+/* =====================
+   Helpers
 ===================== */
 function estadoLabel(e){
   return e === "pagado" ? "PAGADO" :
@@ -37,27 +76,85 @@ function estadoLabel(e){
          e === "pendiente" ? "PEND" : "LIBRE";
 }
 
+function limpiarFormulario(){
+  fields.forEach(f => {
+    const el = document.getElementById(f);
+    if (el) el.value = "";
+  });
+}
+
+function actualizarHint(){
+  hintSelect.style.display = seleccionado ? "none" : "block";
+  btnGuardar.disabled = !seleccionado;
+  btnLiberar.disabled = !seleccionado;
+  btnGuardar.style.opacity = seleccionado ? "1" : ".55";
+  btnLiberar.style.opacity = seleccionado ? "1" : ".55";
+}
+
+function matchSearch(info){
+  if (!searchText) return true;
+  const hay = [
+    info?.nombre, info?.documento, info?.email, info?.telefono, info?.vendedor
+  ].filter(Boolean).join(" ").toLowerCase();
+  return hay.includes(searchText);
+}
+
+function matchFilter(info){
+  if (filterEstado === "todos") return true;
+  const estado = (info?.estadoPago || "libre").toLowerCase();
+  return estado === filterEstado;
+}
+
+function updateStats(){
+  let libre = 0, pend = 0, abono = 0, pag = 0;
+
+  for (let fila = 1, count = 0; count < TOTAL_ASIENTOS; fila++) {
+    for (let i = 0; i < 6 && count < TOTAL_ASIENTOS; i++) {
+      const id = fila + columnas[i];
+      const estado = (data[id]?.estadoPago || "libre").toLowerCase();
+      if (estado === "libre") libre++;
+      else if (estado === "pendiente") pend++;
+      else if (estado === "abono") abono++;
+      else if (estado === "pagado") pag++;
+      count++;
+    }
+  }
+
+  cLibre.textContent = libre;
+  cPend.textContent = pend;
+  cAbono.textContent = abono;
+  cPag.textContent = pag;
+}
+
+/* =====================
+   Render asientos
+===================== */
 function crearAsiento(id){
   const info = data[id] || {};
   const seat = document.createElement("div");
 
-  seat.className = `asiento ${info.estadoPago || "libre"}`;
+  const estado = (info.estadoPago || "libre").toLowerCase();
+  seat.className = `asiento ${estado}`;
+
   seat.innerHTML = `
     <div class="top">
       <span><span class="dot"></span>${id}</span>
-      <span>${estadoLabel(info.estadoPago)}</span>
+      <span>${estadoLabel(estado)}</span>
     </div>
     <div class="name">${info.nombre || "—"}</div>
   `;
+
+  const visible = matchSearch(info) && matchFilter(info);
+  seat.style.opacity = visible ? "1" : ".18";
+  seat.style.pointerEvents = visible ? "auto" : "none";
 
   seat.onclick = () => selectSeat(id, seat);
   return seat;
 }
 
 function render(){
-  if (!avion) return;
-
   avion.innerHTML = "";
+
   let count = 0;
   let fila = 1;
 
@@ -78,6 +175,9 @@ function render(){
     }
     fila++;
   }
+
+  updateStats();
+  actualizarHint();
 }
 
 function selectSeat(id, el){
@@ -85,122 +185,133 @@ function selectSeat(id, el){
 
   seleccionado = id;
   el.classList.add("seleccionado");
-  if (seatLabel) seatLabel.textContent = id;
+  seatLabel.textContent = id;
 
   fields.forEach(f => {
     const input = document.getElementById(f);
     if (input) input.value = data[id]?.[f] ?? "";
   });
+
+  actualizarHint();
 }
 
 /* =====================
-   SUPABASE: CARGAR
+   Supabase CRUD (requiere login)
 ===================== */
 async function cargarDesdeSupabase(){
-  try {
-    console.log("CARGANDO DESDE SUPABASE...");
-
-    const res = await db.from("asientos").select("*");
-
-    console.log("RESPUESTA SELECT:", res);
-
-    if (res.error) {
-      alert(`Error cargando: ${res.error.message}`);
-      return;
-    }
-
+  const session = await requireSession();
+  if (!session) {
     data = {};
-    (res.data || []).forEach(r => {
-      data[r.asiento] = r;
-    });
-
     render();
-  } catch (e) {
-    console.error("EXCEPCIÓN CARGANDO:", e);
-    alert("Error cargando (exception). Mira la consola.");
+    return;
   }
+
+  const res = await db.from("asientos").select("*");
+  if (res.error) {
+    console.error(res.error);
+    alert("Error cargando: " + res.error.message);
+    return;
+  }
+
+  data = {};
+  (res.data || []).forEach(r => { data[r.asiento] = r; });
+  render();
 }
 
-/* =====================
-   SUPABASE: GUARDAR / UPDATE
-===================== */
-document.getElementById("btnGuardar")?.addEventListener("click", async () => {
+async function guardarEnSupabase(){
+  const session = await requireSession();
+  if (!session) return alert("Debes iniciar sesión.");
+
   if (!seleccionado) return alert("Selecciona un asiento");
 
   const payload = { asiento: seleccionado };
-  fields.forEach(f => {
-    const el = document.getElementById(f);
-    payload[f] = el ? (el.value || null) : null;
-  });
+  fields.forEach(f => payload[f] = document.getElementById(f).value || null);
 
   if (!payload.estadoPago) payload.estadoPago = "pendiente";
 
-  try {
-    console.log("ENVIANDO UPSERT:", payload);
-
-    const res = await db
-      .from("asientos")
-      .upsert(payload)
-      .select()
-      .single();
-
-    console.log("RESPUESTA UPSERT:", res);
-
-    if (res.error) {
-      alert(`Error guardando: ${res.error.message}`);
-      return;
-    }
-
-    data[seleccionado] = res.data;
-    render();
-  } catch (e) {
-    console.error("EXCEPCIÓN GUARDANDO:", e);
-    alert("Error guardando (exception). Mira la consola.");
+  const res = await db.from("asientos").upsert(payload).select().single();
+  if (res.error) {
+    console.error(res.error);
+    alert("Error guardando: " + res.error.message);
+    return;
   }
-});
 
-/* =====================
-   SUPABASE: LIBERAR / DELETE
-===================== */
-document.getElementById("btnLiberar")?.addEventListener("click", async () => {
+  data[seleccionado] = res.data;
+  render();
+}
+
+async function liberarEnSupabase(){
+  const session = await requireSession();
+  if (!session) return alert("Debes iniciar sesión.");
+
   if (!seleccionado) return;
   if (!confirm(`¿Liberar el asiento ${seleccionado}?`)) return;
 
-  try {
-    console.log("ELIMINANDO:", seleccionado);
-
-    const res = await db
-      .from("asientos")
-      .delete()
-      .eq("asiento", seleccionado);
-
-    console.log("RESPUESTA DELETE:", res);
-
-    if (res.error) {
-      alert(`Error liberando: ${res.error.message}`);
-      return;
-    }
-
-    delete data[seleccionado];
-    fields.forEach(f => {
-      const el = document.getElementById(f);
-      if (el) el.value = "";
-    });
-    if (seatLabel) seatLabel.textContent = "—";
-    seleccionado = null;
-
-    render();
-  } catch (e) {
-    console.error("EXCEPCIÓN LIBERANDO:", e);
-    alert("Error liberando (exception). Mira la consola.");
+  const res = await db.from("asientos").delete().eq("asiento", seleccionado);
+  if (res.error) {
+    console.error(res.error);
+    alert("Error liberando: " + res.error.message);
+    return;
   }
-});
+
+  delete data[seleccionado];
+  limpiarFormulario();
+  seatLabel.textContent = "—";
+  seleccionado = null;
+  render();
+}
 
 /* =====================
-   EXPORTAR CSV (OPCIONAL)
-   Requiere botón con id="btnCSV"
+   Eventos
 ===================== */
-document.getElementById("btnCSV")?.addEventListener("click", () => {
+btnLogin.addEventListener("click", async () => {
+  showError("");
+
+  const email = (loginEmail.value || "").trim();
+  const password = loginPass.value || "";
+
+  if (!email || !password) return showError("Completa email y contraseña.");
+
+  const { data: out, error } = await db.auth.signInWithPassword({ email, password });
+  if (error) return showError(error.message);
+
+  setMode(true);
+  await cargarDesdeSupabase();
+});
+
+btnLogout.addEventListener("click", async () => {
+  await db.auth.signOut();
+  seleccionado = null;
+  setMode(false);
+  limpiarFormulario();
+});
+
+btnGuardar.addEventListener("click", guardarEnSupabase);
+btnLiberar.addEventListener("click", liberarEnSupabase);
+
+btnNuevo.addEventListener("click", () => {
+  seleccionado = null;
+  document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
+  seatLabel.textContent = "—";
+  limpiarFormulario();
+  actualizarHint();
+});
+
+searchInput.addEventListener("input", (e) => {
+  searchText = (e.target.value || "").trim().toLowerCase();
+  render();
+});
+
+chips.forEach(chip => {
+  chip.addEventListener("click", () => {
+    chips.forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    filterEstado = chip.dataset.filter;
+    render();
+  });
+});
+
+btnCSV.addEventListener("click", () => {
   const headers = ["asiento", ...fields];
   const rows = [headers.join(",")];
 
@@ -209,7 +320,7 @@ document.getElementById("btnCSV")?.addEventListener("click", () => {
     rows.push(row.join(","));
   }
 
-  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([rows.join("\n")], { type:"text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = "asientos.csv";
@@ -219,5 +330,25 @@ document.getElementById("btnCSV")?.addEventListener("click", () => {
 /* =====================
    INIT
 ===================== */
-render();               // pinta la grilla vacía rápido
-cargarDesdeSupabase();  // luego carga datos reales
+(async () => {
+  // Si ya hay sesión, entrar directo
+  const { data: s } = await db.auth.getSession();
+  const logged = !!s.session;
+
+  setMode(logged);
+
+  if (logged) {
+    await cargarDesdeSupabase();
+  } else {
+    // render vacío para que no se vea “sin nada” si cambias a app luego
+    render();
+  }
+
+  // si cambia la sesión (login/logout), sincroniza UI
+  db.auth.onAuthStateChange((_event, session) => {
+    setMode(!!session);
+    if (session) cargarDesdeSupabase();
+  });
+
+  actualizarHint();
+})();
