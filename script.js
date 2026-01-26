@@ -1,40 +1,42 @@
 const SUPABASE_URL = "https://wzmucdhsjbfxjbxvzlxo.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";
-
-const supabase = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const TOTAL_ASIENTOS = 189;
 const columnas = ["A","B","C","D","E","F"];
 
+const loginScreen = document.getElementById("loginScreen");
+const app = document.getElementById("app");
+const avion = document.getElementById("avion");
+const seatLabel = document.getElementById("seatLabel");
+
+const fields = [
+  "nombre","documento","empresa","telefono","email",
+  "vendedor","precio","estadoPago","observaciones"
+];
+
+let data = {};
 let seleccionado = null;
-let datos = {};
 
-async function login(){
-  const email = loginEmail.value;
-  const password = loginPassword.value;
+function setMode(logged){
+  loginScreen.style.display = logged ? "none" : "flex";
+  app.style.display = logged ? "grid" : "none";
+}
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+btnLogin.onclick = async ()=>{
+  const { error } = await db.auth.signInWithPassword({
+    email: loginEmail.value,
+    password: loginPass.value
+  });
   if(error) return alert(error.message);
-
-  loginView.classList.add("hidden");
-  appView.classList.remove("hidden");
+  setMode(true);
   cargar();
-}
+};
 
-async function logout(){
-  await supabase.auth.signOut();
+btnLogout.onclick = async ()=>{
+  await db.auth.signOut();
   location.reload();
-}
-
-async function cargar(){
-  const { data } = await supabase.from("asientos").select("*");
-  datos = {};
-  data?.forEach(a=>datos[a.codigo]=a);
-  render();
-}
+};
 
 function render(){
   avion.innerHTML="";
@@ -42,61 +44,66 @@ function render(){
 
   while(count<TOTAL_ASIENTOS){
     for(let i=0;i<6;i++){
-      if(i===3) avion.appendChild(document.createElement("div")).className="pasillo";
+      if(i===3) avion.appendChild(document.createElement("div"));
       if(count>=TOTAL_ASIENTOS) break;
+
       const id=fila+columnas[i];
-      avion.appendChild(crearAsiento(id));
+      const info=data[id]||{};
+      const el=document.createElement("div");
+      el.className="asiento"+(seleccionado===id?" seleccionado":"");
+      el.innerHTML=`<strong>${id}</strong><br>${info.nombre||"LIBRE"}`;
+      el.onclick=()=>selectSeat(id);
+      avion.appendChild(el);
       count++;
     }
     fila++;
   }
 }
 
-function crearAsiento(id){
-  const info=datos[id]||{};
-  const d=document.createElement("div");
-  d.className=`asiento ${info.estado||"libre"}`;
-  d.innerHTML=`<strong>${id}</strong><br>${info.nombre||"LIBRE"}`;
-  d.onclick=()=>select(id,d);
-  return d;
-}
-
-function select(id,el){
-  document.querySelectorAll(".asiento").forEach(a=>a.classList.remove("seleccionado"));
-  el.classList.add("seleccionado");
+function selectSeat(id){
   seleccionado=id;
   seatLabel.textContent=id;
-
-  ["nombre","documento","empresa","telefono","email","vendedor","precio","estado","observaciones"]
-    .forEach(f=>window[f].value=datos[id]?.[f]||"");
+  fields.forEach(f=>document.getElementById(f).value=data[id]?.[f]||"");
+  render();
 }
 
-async function guardar(){
+async function cargar(){
+  const r=await db.from("asientos").select("*");
+  data={};
+  r.data?.forEach(x=>data[x.asiento]=x);
+  render();
+}
+
+btnGuardar.onclick = async ()=>{
   if(!seleccionado) return;
-  const payload={ codigo:seleccionado };
-
-  ["nombre","documento","empresa","telefono","email","vendedor","precio","estado","observaciones"]
-    .forEach(f=>payload[f]=window[f].value);
-
-  await supabase.from("asientos").upsert(payload);
+  const p={ asiento:seleccionado };
+  fields.forEach(f=>p[f]=document.getElementById(f).value||null);
+  await db.from("asientos").upsert(p);
   cargar();
-}
+};
 
-async function liberar(){
+btnLiberar.onclick = async ()=>{
   if(!seleccionado) return;
-  await supabase.from("asientos").delete().eq("codigo",seleccionado);
+  await db.from("asientos").delete().eq("asiento",seleccionado);
   seleccionado=null;
+  seatLabel.textContent="—";
   cargar();
-}
+};
 
-function exportarCSV(){
-  const rows=[["Asiento","Nombre","Documento","Empresa","Telefono","Email","Vendedor","Precio","Estado","Obs"]];
-  Object.values(datos).forEach(d=>{
-    rows.push([d.codigo,d.nombre,d.documento,d.empresa,d.telefono,d.email,d.vendedor,d.precio,d.estado,d.observaciones]);
-  });
-  const csv=rows.map(r=>r.join(",")).join("\n");
+btnCSV.onclick = ()=>{
+  const rows=[["asiento",...fields].join(",")];
+  for(const a in data){
+    rows.push([a,...fields.map(f=>data[a]?.[f]||"")].join(","));
+  }
+  const blob=new Blob([rows.join("\n")],{type:"text/csv"});
   const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.href=URL.createObjectURL(blob);
   a.download="asientos.csv";
   a.click();
-}
+};
+
+(async()=>{
+  const { data:s } = await db.auth.getSession();
+  setMode(!!s.session);
+  if(s.session) cargar();
+})();

@@ -1,46 +1,47 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Mapa de Asientos</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
 
 <!-- LOGIN -->
-<div id="loginView" class="login-container">
-  <div class="login-card">
-    <h2>Mapa de Asientos</h2>
+<section id="loginScreen" class="auth-screen">
+  <div class="auth-card">
+    <h1>Mapa de Asientos</h1>
     <p>Acceso para vendedor</p>
 
     <label>Email</label>
-    <input id="loginEmail" type="email">
+    <input id="loginEmail" />
 
     <label>Contraseña</label>
-    <input id="loginPassword" type="password">
+    <input id="loginPass" type="password" />
 
-    <button onclick="login()">Entrar</button>
+    <button id="btnLogin" class="btn primary">Entrar</button>
   </div>
-</div>
+</section>
 
 <!-- APP -->
-<div id="appView" class="layout hidden">
-
-  <header>
-    <h1>Mapa de Asientos</h1>
-    <span>Avión 3–3 · 189 puestos</span>
-    <button class="logout" onclick="logout()">Salir</button>
-  </header>
-
-  <!-- MAPA -->
+<div id="app" class="layout" style="display:none;">
   <section class="seats">
+    <header class="topbar">
+      <div>
+        <h2>Mapa de Asientos</h2>
+        <span>Avión 3–3 · 189 puestos</span>
+      </div>
+      <button id="btnLogout" class="btn danger">Salir</button>
+    </header>
+
     <div id="avion" class="grid"></div>
   </section>
 
-  <!-- PANEL -->
   <section class="panel">
-    <h2>Asiento <span id="seatLabel">—</span></h2>
+    <h3>Asiento <span id="seatLabel">—</span></h3>
 
     <label>Nombre del pasajero</label>
     <input id="nombre">
@@ -48,7 +49,7 @@
     <label>Documento / Pasaporte</label>
     <input id="documento">
 
-    <!-- ✅ NUEVO CAMPO -->
+    <!-- NUEVO -->
     <label>Empresa</label>
     <input id="empresa">
 
@@ -67,7 +68,7 @@
     <input id="precio" type="number">
 
     <label>Estado</label>
-    <select id="estado">
+    <select id="estadoPago">
       <option value="libre">LIBRE</option>
       <option value="pendiente">PENDIENTE</option>
       <option value="abono">ABONO</option>
@@ -78,16 +79,14 @@
     <input id="observaciones">
 
     <div class="actions">
-      <button class="primary" onclick="guardar()">Guardar</button>
-      <button class="danger" onclick="liberar()">Liberar</button>
+      <button id="btnGuardar" class="btn primary">Guardar</button>
+      <button id="btnLiberar" class="btn danger">Liberar</button>
     </div>
 
-    <button class="export" onclick="exportarCSV()">Exportar CSV</button>
+    <button id="btnCSV" class="btn export">Exportar CSV</button>
   </section>
-
 </div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script src="script.js"></script>
+<script src="script.js?v=12"></script>
 </body>
 </html>
