@@ -1,8 +1,8 @@
 /* =====================
    SUPABASE (cambia aquí)
 ===================== */
-const SUPABASE_URL = "https://wzmucdhsjbfxjbxvzlxo.supabase.co"; // <-- cambia
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";                 // <-- cambia
+const SUPABASE_URL = "https://TU-PROYECTO.supabase.co"; // <-- cambia
+const SUPABASE_ANON = "TU-ANON-PUBLIC";                 // <-- cambia
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
