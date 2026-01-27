@@ -1,17 +1,22 @@
 /* =====================
    SUPABASE (cambia aquí)
 ===================== */
-const SUPABASE_URL = "https://wzmucdhsjbfxjbxvzlxo.supabase.co"; // <-- cambia
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";                 // <-- cambia
+const SUPABASE_URL  = "https://wzmucdhsjbfxjbxvzlxo.supabase.co";  // <-- cambia
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";              // <-- cambia
 
+// ⚠️ No declares `supabase` para evitar: Identifier 'supabase' has already been declared
+if (!window.supabase) {
+  alert("No se cargó el SDK de Supabase. Revisa el <script src='https://unpkg.com/@supabase/supabase-js@2'>");
+}
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /* =====================
    CONFIG
 ===================== */
-const TOTAL_ASIENTOS = 189; // ✅ 189
+const TOTAL_ASIENTOS = 189;
 const columnas = ["A","B","C","D","E","F"];
 
+// ✅ Incluye empresa
 const fields = [
   "nombre","documento","empresa","telefono","email",
   "vendedor","precio","moneda",
@@ -33,6 +38,7 @@ const authError = document.getElementById("authError");
 const avion = document.getElementById("avion");
 const seatLabel = document.getElementById("seatLabel");
 const hintSelect = document.getElementById("hintSelect");
+const hintRO = document.getElementById("hintRO");
 
 const searchInput = document.getElementById("search");
 const chips = Array.from(document.querySelectorAll(".chip"));
@@ -51,6 +57,7 @@ let seleccionado = null;
 let data = {};
 let filterEstado = "todos";
 let searchText = "";
+let isReadOnly = false;
 
 /* =====================
    Auth helpers
@@ -69,6 +76,33 @@ async function getSession(){
 }
 
 /* =====================
+   ROLES (EDITOR / VIEWER)
+   Opción rápida:
+   - Si el usuario en Supabase tiene user_metadata.role = "viewer" => solo lectura
+   - Si no tiene role o es "editor" => puede editar
+===================== */
+function applyRole(session){
+  const role = session?.user?.user_metadata?.role || "editor";
+  isReadOnly = (role === "viewer");
+
+  // marca visual + bloqueo
+  app.classList.toggle("readonly", isReadOnly);
+  if (hintRO) hintRO.style.display = isReadOnly ? "block" : "none";
+  if (hintSelect) hintSelect.style.display = (!seleccionado && !isReadOnly) ? "block" : "none";
+
+  // botones
+  btnGuardar.disabled = isReadOnly || !seleccionado;
+  btnLiberar.disabled = isReadOnly || !seleccionado;
+  btnNuevo.disabled = isReadOnly;
+
+  // inputs/selects del panel (bloqueo fuerte)
+  fields.forEach(f=>{
+    const el = document.getElementById(f);
+    if (el) el.disabled = isReadOnly;
+  });
+}
+
+/* =====================
    UI helpers
 ===================== */
 function estadoLabel(e){
@@ -83,16 +117,24 @@ function limpiarFormulario(){
   });
 }
 function actualizarHint(){
+  if (isReadOnly) {
+    hintSelect.style.display = "none";
+    btnGuardar.disabled = true;
+    btnLiberar.disabled = true;
+    btnNuevo.disabled = true;
+    return;
+  }
   hintSelect.style.display = seleccionado ? "none" : "block";
   btnGuardar.disabled = !seleccionado;
   btnLiberar.disabled = !seleccionado;
   btnGuardar.style.opacity = seleccionado ? "1" : ".55";
   btnLiberar.style.opacity = seleccionado ? "1" : ".55";
 }
+
 function matchSearch(info){
   if (!searchText) return true;
   const hay = [
-    info?.nombre, info?.documento, info?.email, info?.telefono, info?.vendedor
+    info?.nombre, info?.documento, info?.empresa, info?.email, info?.telefono, info?.vendedor
   ].filter(Boolean).join(" ").toLowerCase();
   return hay.includes(searchText);
 }
@@ -156,7 +198,6 @@ function render(){
 
   while (count < TOTAL_ASIENTOS) {
     for (let i = 0; i < 6; i++) {
-
       if (i === 3) {
         const pasillo = document.createElement("div");
         pasillo.className = "pasillo";
@@ -215,6 +256,7 @@ async function cargarDesdeSupabase(){
 }
 
 async function guardarEnSupabase(){
+  if (isReadOnly) return alert("Este usuario es solo lectura.");
   const session = await getSession();
   if (!session) return alert("Debes iniciar sesión.");
   if (!seleccionado) return alert("Selecciona un asiento");
@@ -246,6 +288,7 @@ async function guardarEnSupabase(){
 }
 
 async function liberarEnSupabase(){
+  if (isReadOnly) return alert("Este usuario es solo lectura.");
   const session = await getSession();
   if (!session) return alert("Debes iniciar sesión.");
   if (!seleccionado) return;
@@ -296,16 +339,19 @@ btnLogin.addEventListener("click", async () => {
 
   if (!email || !password) return showError("Completa email y contraseña.");
 
-  const { error } = await db.auth.signInWithPassword({ email, password });
+  const { data: auth, error } = await db.auth.signInWithPassword({ email, password });
   if (error) return showError(error.message);
 
   setMode(true);
+  applyRole(auth.session);
   await cargarDesdeSupabase();
 });
 
 btnLogout.addEventListener("click", async () => {
   await db.auth.signOut();
   seleccionado = null;
+  isReadOnly = false;
+  app.classList.remove("readonly");
   setMode(false);
   limpiarFormulario();
 });
@@ -314,6 +360,7 @@ btnGuardar.addEventListener("click", guardarEnSupabase);
 btnLiberar.addEventListener("click", liberarEnSupabase);
 
 btnNuevo.addEventListener("click", () => {
+  if (isReadOnly) return;
   seleccionado = null;
   document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
   seatLabel.textContent = "—";
@@ -347,11 +394,17 @@ btnCSV.addEventListener("click", exportCSV);
   setMode(logged);
   render();
 
-  if (logged) await cargarDesdeSupabase();
+  if (logged) {
+    applyRole(s.session);
+    await cargarDesdeSupabase();
+  }
 
   db.auth.onAuthStateChange((_event, session) => {
     setMode(!!session);
-    if (session) cargarDesdeSupabase();
+    if (session) {
+      applyRole(session);
+      cargarDesdeSupabase();
+    }
   });
 
   actualizarHint();

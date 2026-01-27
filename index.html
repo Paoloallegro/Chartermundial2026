@@ -8,7 +8,7 @@
   <!-- Supabase SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles.css?v=9" />
+  <link rel="stylesheet" href="./styles.css?v=10" />
 </head>
 <body>
 
@@ -87,9 +87,10 @@
       <label>Documento / Pasaporte</label>
       <input id="documento" autocomplete="off" />
 
-
+      <!-- ✅ NUEVO CAMPO -->
       <label>Empresa</label>
       <input id="empresa" autocomplete="off" />
+
       <label>Teléfono</label>
       <input id="telefono" autocomplete="off" />
 
@@ -141,11 +142,12 @@
       <button id="btnCSV" class="btn export">⬇ Exportar CSV</button>
 
       <p class="hint" id="hintSelect">Selecciona un asiento para editar y guardar.</p>
+      <p class="hint hint-ro" id="hintRO" style="display:none;">Modo solo lectura: no puedes editar.</p>
     </div>
   </section>
 
 </div>
 
-<script src="./script.js?v=9"></script>
+<script src="./script.js?v=10"></script>
 </body>
 </html>

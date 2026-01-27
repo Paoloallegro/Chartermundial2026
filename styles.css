@@ -343,6 +343,22 @@ hr{
   color: var(--muted);
   opacity:.9;
 }
+.hint-ro{
+  color: rgba(56,189,248,.95);
+}
+
+/* Solo lectura */
+.readonly input,
+.readonly select{
+  opacity:.75;
+  pointer-events:none;
+}
+.readonly #btnGuardar,
+.readonly #btnLiberar,
+.readonly #btnNuevo{
+  opacity:.5;
+  pointer-events:none;
+}
 
 @media (max-width: 1100px){
   .layout{ grid-template-columns: 1fr; }
