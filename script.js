@@ -44,9 +44,10 @@ const searchInput = document.getElementById("search");
 const chips = Array.from(document.querySelectorAll(".chip"));
 
 const cLibre = document.getElementById("cLibre");
-const cPend  = document.getElementById("cPend");
+const cPend  = document.getElementById("cPend"); // (MISMO ID) ahora cuenta HOLD
 const cAbono = document.getElementById("cAbono");
 const cPag   = document.getElementById("cPag");
+const cBloq = document.getElementById("cBloq");
 
 const btnNuevo = document.getElementById("btnNuevo");
 const btnGuardar = document.getElementById("btnGuardar");
@@ -58,6 +59,15 @@ let data = {};
 let filterEstado = "todos";
 let searchText = "";
 let isReadOnly = false;
+
+/* =====================
+   Helpers estado (compat)
+   - si viene "pendiente" => lo tratamos como "hold"
+===================== */
+function normalizeEstado(e){
+  const x = (e || "libre").toString().toLowerCase();
+  return x === "pendiente" ? "hold" : x;
+}
 
 /* =====================
    Auth helpers
@@ -77,9 +87,6 @@ async function getSession(){
 
 /* =====================
    ROLES (EDITOR / VIEWER)
-   Opción rápida:
-   - Si el usuario en Supabase tiene user_metadata.role = "viewer" => solo lectura
-   - Si no tiene role o es "editor" => puede editar
 ===================== */
 function applyRole(session){
   const role = session?.user?.user_metadata?.role || "editor";
@@ -106,9 +113,11 @@ function applyRole(session){
    UI helpers
 ===================== */
 function estadoLabel(e){
-  return e === "pagado" ? "PAGADO" :
-         e === "abono" ? "ABONO" :
-         e === "pendiente" ? "PEND" : "LIBRE";
+  const st = normalizeEstado(e);
+  return st === "pagado" ? "PAGADO" :
+         st === "abono" ? "ABONO" :
+         st === "hold" ? "HOLD" :
+         st === "bloqueo" ? "BLOQUEO" : "LIBRE";
 }
 function limpiarFormulario(){
   fields.forEach(f => {
@@ -140,28 +149,31 @@ function matchSearch(info){
 }
 function matchFilter(info){
   if (filterEstado === "todos") return true;
-  const estado = (info?.estadoPago || "libre").toLowerCase();
+  const estado = normalizeEstado(info?.estadoPago || "libre");
   return estado === filterEstado;
 }
 function updateStats(){
-  let libre = 0, pend = 0, abono = 0, pag = 0;
+  let libre = 0, hold = 0, abono = 0, pag = 0, bloq = 0;
 
   for (let fila = 1, count = 0; count < TOTAL_ASIENTOS; fila++) {
     for (let i = 0; i < 6 && count < TOTAL_ASIENTOS; i++) {
       const id = fila + columnas[i];
-      const estado = (data[id]?.estadoPago || "libre").toLowerCase();
+      const estado = normalizeEstado(data[id]?.estadoPago || "libre");
+
       if (estado === "libre") libre++;
-      else if (estado === "pendiente") pend++;
+      else if (estado === "hold") hold++;
       else if (estado === "abono") abono++;
       else if (estado === "pagado") pag++;
+      else if (estado === "bloqueo") bloq++;
       count++;
     }
   }
 
   cLibre.textContent = libre;
-  cPend.textContent = pend;
+  cPend.textContent = hold; // (MISMO ID) ahora muestra HOLD
   cAbono.textContent = abono;
   cPag.textContent = pag;
+  if (cBloq) cBloq.textContent = bloq;
 }
 
 /* =====================
@@ -171,7 +183,7 @@ function crearAsiento(id){
   const info = data[id] || {};
   const seat = document.createElement("div");
 
-  const estado = (info.estadoPago || "libre").toLowerCase();
+  const estado = normalizeEstado(info.estadoPago || "libre");
   seat.className = `asiento ${estado}`;
 
   seat.innerHTML = `
@@ -187,6 +199,10 @@ function crearAsiento(id){
   seat.style.opacity = visible ? "1" : ".18";
   seat.style.pointerEvents = visible ? "auto" : "none";
 
+  if (estado === "bloqueo") {
+    seat.classList.add("disabled");
+    seat.style.cursor = "not-allowed";
+  }
   seat.onclick = () => selectSeat(id, seat);
   return seat;
 }
@@ -214,6 +230,23 @@ function render(){
   }
 
   updateStats();
+    const estadoActual = normalizeEstado(data[id]?.estadoPago || "libre");
+  if (estadoActual === "bloqueo") {
+    fields.forEach(f => {
+      const el2 = document.getElementById(f);
+      if (el2) el2.disabled = true;
+    });
+    const ep = document.getElementById("estadoPago");
+    if (ep) ep.disabled = false;
+    if (hintRO) hintRO.style.display = "block";
+  } else {
+    fields.forEach(f => {
+      const el2 = document.getElementById(f);
+      if (el2) el2.disabled = false;
+    });
+    if (hintRO) hintRO.style.display = "none";
+  }
+
   actualizarHint();
 }
 
@@ -226,8 +259,29 @@ function selectSeat(id, el){
 
   fields.forEach(f => {
     const input = document.getElementById(f);
-    if (input) input.value = data[id]?.[f] ?? "";
+    if (!input) return;
+
+    // compat: si lo guardado es "pendiente" lo mostramos como "hold"
+    if (f === "estadoPago") input.value = normalizeEstado(data[id]?.[f] ?? "");
+    else input.value = data[id]?.[f] ?? "";
   });
+
+    const estadoActual = normalizeEstado(data[id]?.estadoPago || "libre");
+  if (estadoActual === "bloqueo") {
+    fields.forEach(f => {
+      const el2 = document.getElementById(f);
+      if (el2) el2.disabled = true;
+    });
+    const ep = document.getElementById("estadoPago");
+    if (ep) ep.disabled = false;
+    if (hintRO) hintRO.style.display = "block";
+  } else {
+    fields.forEach(f => {
+      const el2 = document.getElementById(f);
+      if (el2) el2.disabled = false;
+    });
+    if (hintRO) hintRO.style.display = "none";
+  }
 
   actualizarHint();
 }
@@ -251,7 +305,14 @@ async function cargarDesdeSupabase(){
   }
 
   data = {};
-  (res.data || []).forEach(r => { data[r.asiento] = r; });
+  (res.data || []).forEach(r => {
+    // normalizamos al cargar
+    if (r && typeof r === "object") {
+      r.estadoPago = normalizeEstado(r.estadoPago);
+    }
+    data[r.asiento] = r;
+  });
+
   render();
 }
 
@@ -274,7 +335,11 @@ async function guardarEnSupabase(){
     payload.precio = Number.isFinite(n) ? n : null;
   } else payload.precio = null;
 
-  if (!payload.estadoPago) payload.estadoPago = "pendiente";
+  // ✅ default ahora es HOLD
+  if (!payload.estadoPago) payload.estadoPago = "hold";
+
+  // compat: si por error llega "pendiente", lo convertimos
+  payload.estadoPago = normalizeEstado(payload.estadoPago);
 
   const res = await db.from("asientos").upsert(payload).select().single();
   if (res.error) {
@@ -282,6 +347,9 @@ async function guardarEnSupabase(){
     alert("Error guardando: " + res.error.message);
     return;
   }
+
+  // normaliza lo que vuelve
+  res.data.estadoPago = normalizeEstado(res.data.estadoPago);
 
   data[seleccionado] = res.data;
   render();
@@ -316,8 +384,13 @@ function exportCSV(){
   const rows = [headers.join(",")];
 
   for (const a in data) {
-    const row = [a, ...fields.map(f => (data[a]?.[f] ?? "").toString().replace(/"/g,'""'))]
-      .map(v => `"${v}"`);
+    const row = [a, ...fields.map(f => {
+      let v = (data[a]?.[f] ?? "");
+      // compat: exporta HOLD si había pendiente
+      if (f === "estadoPago") v = normalizeEstado(v);
+      return v.toString().replace(/"/g,'""');
+    })].map(v => `"${v}"`);
+
     rows.push(row.join(","));
   }
 
@@ -365,6 +438,23 @@ btnNuevo.addEventListener("click", () => {
   document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
   seatLabel.textContent = "—";
   limpiarFormulario();
+    const estadoActual = normalizeEstado(data[id]?.estadoPago || "libre");
+  if (estadoActual === "bloqueo") {
+    fields.forEach(f => {
+      const el2 = document.getElementById(f);
+      if (el2) el2.disabled = true;
+    });
+    const ep = document.getElementById("estadoPago");
+    if (ep) ep.disabled = false;
+    if (hintRO) hintRO.style.display = "block";
+  } else {
+    fields.forEach(f => {
+      const el2 = document.getElementById(f);
+      if (el2) el2.disabled = false;
+    });
+    if (hintRO) hintRO.style.display = "none";
+  }
+
   actualizarHint();
 });
 
@@ -406,6 +496,23 @@ btnCSV.addEventListener("click", exportCSV);
       cargarDesdeSupabase();
     }
   });
+
+    const estadoActual = normalizeEstado(data[id]?.estadoPago || "libre");
+  if (estadoActual === "bloqueo") {
+    fields.forEach(f => {
+      const el2 = document.getElementById(f);
+      if (el2) el2.disabled = true;
+    });
+    const ep = document.getElementById("estadoPago");
+    if (ep) ep.disabled = false;
+    if (hintRO) hintRO.style.display = "block";
+  } else {
+    fields.forEach(f => {
+      const el2 = document.getElementById(f);
+      if (el2) el2.disabled = false;
+    });
+    if (hintRO) hintRO.style.display = "none";
+  }
 
   actualizarHint();
 })();

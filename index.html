@@ -8,7 +8,7 @@
   <!-- Supabase SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles.css?v=10" />
+  <link rel="stylesheet" href="./styles.css?v=11" />
 </head>
 <body>
 
@@ -49,20 +49,24 @@
 
       <div class="stats">
         <div class="stat"><span id="cLibre">0</span><small>Libres</small></div>
-        <div class="stat"><span id="cPend">0</span><small>Pend.</small></div>
+        <!-- MISMO ID cPend, solo texto cambiado -->
+        <div class="stat"><span id="cPend">0</span><small>HOLD</small></div>
         <div class="stat"><span id="cAbono">0</span><small>Abono</small></div>
         <div class="stat"><span id="cPag">0</span><small>Pagado</small></div>
-      </div>
+              <div class="stat"><span id="cBloq">0</span><small>Bloqueo</small></div>
+</div>
 
       <div class="controls">
         <input id="search" class="search" placeholder="Buscar pasajero / documento / email…" />
         <div class="filters">
           <button class="chip active" data-filter="todos">Todos</button>
           <button class="chip" data-filter="libre">Libre</button>
-          <button class="chip" data-filter="pendiente">Pendiente</button>
+          <!-- MISMA ESTRUCTURA, solo data-filter y texto -->
+          <button class="chip" data-filter="hold">HOLD</button>
           <button class="chip" data-filter="abono">Abono</button>
           <button class="chip" data-filter="pagado">Pagado</button>
-        </div>
+                  <button class="chip" data-filter="bloqueo">Bloqueo</button>
+</div>
       </div>
 
       <div class="top-actions">
@@ -87,7 +91,7 @@
       <label>Documento / Pasaporte</label>
       <input id="documento" autocomplete="off" />
 
-      <!-- ✅ NUEVO CAMPO -->
+      <!-- ✅ CAMPO EMPRESA (ya lo tenías) -->
       <label>Empresa</label>
       <input id="empresa" autocomplete="off" />
 
@@ -123,13 +127,15 @@
       <label>Estado de pago</label>
       <select id="estadoPago">
         <option value="libre">LIBRE</option>
-        <option value="pendiente">PENDIENTE</option>
+        <!-- valor y texto cambiado -->
+        <option value="hold">HOLD</option>
         <option value="abono">ABONO</option>
         <option value="pagado">PAGADO</option>
-      </select>
+              <option value="bloqueo">BLOQUEO</option>
+</select>
 
       <label>Fecha de pago</label>
-      <input id="fechaPago" placeholder="YYYY-MM-DD (o texto)" />
+      <input id="fechaPago" type="date" />
 
       <label>Observaciones</label>
       <input id="observaciones" autocomplete="off" />
@@ -148,6 +154,6 @@
 
 </div>
 
-<script src="./script.js?v=10"></script>
+<script src="./script.js?v=11"></script>
 </body>
 </html>

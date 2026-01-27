@@ -6,9 +6,12 @@
   --muted:#9ca3af;
 
   --libre:#22c55e;
-  --pendiente:#f59e0b;
+  /* antes --pendiente, ahora HOLD */
+  --hold:#f59e0b;
   --abono:#a855f7;
   --pagado:#3b82f6;
+
+  --bloqueo:#6b7280;
 
   --cyan:#38bdf8;
 }
@@ -233,11 +236,22 @@ body{
   word-break:break-word;
 }
 
+.asiento.disabled{
+  opacity:.55;
+  filter: grayscale(1);
+}
+
 /* estados */
 .asiento.libre .dot{ background:var(--libre); }
-.asiento.pendiente .dot{ background:var(--pendiente); }
+
+/* ✅ HOLD (y compat con pendiente por datos viejos) */
+.asiento.hold .dot{ background:var(--hold); }
+.asiento.pendiente .dot{ background:var(--hold); }
+
 .asiento.abono .dot{ background:var(--abono); }
 .asiento.pagado .dot{ background:var(--pagado); }
+
+.asiento.bloqueo .dot{ background:var(--bloqueo); }
 
 /* Panel */
 .panel{
@@ -364,4 +378,13 @@ hr{
   .layout{ grid-template-columns: 1fr; }
   .panel{ border-left:none; border-top:1px solid rgba(31,41,55,.85); }
   .topbar{ grid-template-columns: 1fr; }
+}
+
+
+/* ======================
+   Icono calendario (modo oscuro)
+====================== */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
 }
