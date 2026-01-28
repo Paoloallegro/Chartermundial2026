@@ -31,6 +31,7 @@ const app = document.getElementById("app");
 
 const loginEmail = document.getElementById("loginEmail");
 const loginPass = document.getElementById("loginPass");
+const matchSelect = document.getElementById("matchSelect");
 const btnLogin = document.getElementById("btnLogin");
 const btnLogout = document.getElementById("btnLogout");
 const authError = document.getElementById("authError");
@@ -80,6 +81,20 @@ function setMode(logged){
   loginScreen.style.display = logged ? "none" : "flex";
   app.style.display = logged ? "grid" : "none";
 }
+
+/* =====================
+   Partido seleccionado (login)
+===================== */
+function applyMatchTitle(){
+  const v = sessionStorage.getItem("match") || "";
+  const titleEl = document.querySelector(".brand .title");
+  if (!titleEl) return;
+
+  if (v === "PA-EN") titleEl.textContent = "PANAMÁ VS INGLATERRA";
+  else if (v === "PA-GH") titleEl.textContent = "PANAMÁ VS GHANA";
+  else titleEl.textContent = "CHARTER";
+}
+
 async function getSession(){
   const { data: s } = await db.auth.getSession();
   return s.session;
@@ -139,6 +154,29 @@ function actualizarHint(){
   btnGuardar.style.opacity = seleccionado ? "1" : ".55";
   btnLiberar.style.opacity = seleccionado ? "1" : ".55";
 }
+
+
+/* =====================
+   BLOQUEO: permitir click pero bloquear edición
+===================== */
+function applySeatFormLock(){
+  if (isReadOnly) return; // viewer ya bloquea todo
+
+  const estadoActual = normalizeEstado(data[seleccionado]?.estadoPago || "libre");
+  const isBloqueo = (estadoActual === "bloqueo");
+
+  fields.forEach(f => {
+    const el = document.getElementById(f);
+    if (!el) return;
+    el.disabled = isBloqueo;
+  });
+
+  const ep = document.getElementById("estadoPago");
+  if (ep) ep.disabled = false; // siempre permite cambiar estado
+
+  if (hintRO) hintRO.style.display = isBloqueo ? "block" : "none";
+}
+
 
 function matchSearch(info){
   if (!searchText) return true;
@@ -230,23 +268,6 @@ function render(){
   }
 
   updateStats();
-    const estadoActual = normalizeEstado(data[id]?.estadoPago || "libre");
-  if (estadoActual === "bloqueo") {
-    fields.forEach(f => {
-      const el2 = document.getElementById(f);
-      if (el2) el2.disabled = true;
-    });
-    const ep = document.getElementById("estadoPago");
-    if (ep) ep.disabled = false;
-    if (hintRO) hintRO.style.display = "block";
-  } else {
-    fields.forEach(f => {
-      const el2 = document.getElementById(f);
-      if (el2) el2.disabled = false;
-    });
-    if (hintRO) hintRO.style.display = "none";
-  }
-
   actualizarHint();
 }
 
@@ -265,24 +286,7 @@ function selectSeat(id, el){
     if (f === "estadoPago") input.value = normalizeEstado(data[id]?.[f] ?? "");
     else input.value = data[id]?.[f] ?? "";
   });
-
-    const estadoActual = normalizeEstado(data[id]?.estadoPago || "libre");
-  if (estadoActual === "bloqueo") {
-    fields.forEach(f => {
-      const el2 = document.getElementById(f);
-      if (el2) el2.disabled = true;
-    });
-    const ep = document.getElementById("estadoPago");
-    if (ep) ep.disabled = false;
-    if (hintRO) hintRO.style.display = "block";
-  } else {
-    fields.forEach(f => {
-      const el2 = document.getElementById(f);
-      if (el2) el2.disabled = false;
-    });
-    if (hintRO) hintRO.style.display = "none";
-  }
-
+  applySeatFormLock();
   actualizarHint();
 }
 
@@ -412,16 +416,24 @@ btnLogin.addEventListener("click", async () => {
 
   if (!email || !password) return showError("Completa email y contraseña.");
 
+  const match = (matchSelect?.value || "").trim();
+  if (!match) return showError("Selecciona el partido.");
+  sessionStorage.setItem("match", match);
+
   const { data: auth, error } = await db.auth.signInWithPassword({ email, password });
   if (error) return showError(error.message);
 
   setMode(true);
+  applyMatchTitle();
   applyRole(auth.session);
   await cargarDesdeSupabase();
 });
 
 btnLogout.addEventListener("click", async () => {
   await db.auth.signOut();
+  sessionStorage.removeItem("match");
+  if (matchSelect) matchSelect.value = "";
+  applyMatchTitle();
   seleccionado = null;
   isReadOnly = false;
   app.classList.remove("readonly");
@@ -438,23 +450,11 @@ btnNuevo.addEventListener("click", () => {
   document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
   seatLabel.textContent = "—";
   limpiarFormulario();
-    const estadoActual = normalizeEstado(data[id]?.estadoPago || "libre");
-  if (estadoActual === "bloqueo") {
-    fields.forEach(f => {
-      const el2 = document.getElementById(f);
-      if (el2) el2.disabled = true;
-    });
-    const ep = document.getElementById("estadoPago");
-    if (ep) ep.disabled = false;
-    if (hintRO) hintRO.style.display = "block";
-  } else {
-    fields.forEach(f => {
-      const el2 = document.getElementById(f);
-      if (el2) el2.disabled = false;
-    });
-    if (hintRO) hintRO.style.display = "none";
-  }
-
+  if (hintRO) hintRO.style.display = "none";
+  fields.forEach(f => {
+    const el2 = document.getElementById(f);
+    if (el2) el2.disabled = false;
+  });
   actualizarHint();
 });
 
@@ -496,23 +496,5 @@ btnCSV.addEventListener("click", exportCSV);
       cargarDesdeSupabase();
     }
   });
-
-    const estadoActual = normalizeEstado(data[id]?.estadoPago || "libre");
-  if (estadoActual === "bloqueo") {
-    fields.forEach(f => {
-      const el2 = document.getElementById(f);
-      if (el2) el2.disabled = true;
-    });
-    const ep = document.getElementById("estadoPago");
-    if (ep) ep.disabled = false;
-    if (hintRO) hintRO.style.display = "block";
-  } else {
-    fields.forEach(f => {
-      const el2 = document.getElementById(f);
-      if (el2) el2.disabled = false;
-    });
-    if (hintRO) hintRO.style.display = "none";
-  }
-
   actualizarHint();
 })();

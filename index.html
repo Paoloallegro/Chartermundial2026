@@ -23,8 +23,19 @@
     <label class="auth-label">Email</label>
     <input id="loginEmail" class="auth-input" placeholder="correo@empresa.com" autocomplete="username" />
 
-    <label class="auth-label">Contraseña</label>
+    <div class="auth-row">
+      <label class="auth-label">Contraseña</label>
+      <a class="auth-forgot" href="#" onclick="return false;">¿Olvidaste tu contraseña?</a>
+    </div>
     <input id="loginPass" class="auth-input" type="password" placeholder="••••••••" autocomplete="current-password" />
+
+    <label class="auth-label">Selecciona el partido</label>
+    <select id="matchSelect" class="auth-input auth-select">
+      <option value="">— Seleccionar —</option>
+      <option value="PA-EN">Panamá VS Inglaterra</option>
+      <option value="PA-GH">Panamá VS Ghana</option>
+    </select>
+
 
     <button id="btnLogin" class="btn primary full">Entrar</button>
 
@@ -43,7 +54,7 @@
   <section class="seats">
     <header class="topbar">
       <div class="brand">
-        <div class="title">Mapa de Asientos</div>
+        <div class="title">CHARTER INGLATERRA</div>
         <div class="subtitle">Avión 3–3 · 189 puestos</div>
       </div>
 
