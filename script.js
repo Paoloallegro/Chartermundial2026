@@ -95,6 +95,12 @@ function applyMatchTitle(){
   else titleEl.textContent = "CHARTER";
 }
 
+// ✅ Tabla dinámica según partido
+function getTableName(){
+  const m = sessionStorage.getItem("match") || "";
+  return (m === "PA-GH") ? "asientos_ghana" : "asientos";
+}
+
 async function getSession(){
   const { data: s } = await db.auth.getSession();
   return s.session;
@@ -301,7 +307,7 @@ async function cargarDesdeSupabase(){
     return;
   }
 
-  const res = await db.from("asientos").select("*");
+  const res = await db.from(getTableName()).select("*");
   if (res.error) {
     console.error(res.error);
     alert("Error cargando: " + res.error.message);
@@ -345,7 +351,7 @@ async function guardarEnSupabase(){
   // compat: si por error llega "pendiente", lo convertimos
   payload.estadoPago = normalizeEstado(payload.estadoPago);
 
-  const res = await db.from("asientos").upsert(payload).select().single();
+  const res = await db.from(getTableName()).upsert(payload).select().single();
   if (res.error) {
     console.error(res.error);
     alert("Error guardando: " + res.error.message);
@@ -366,7 +372,7 @@ async function liberarEnSupabase(){
   if (!seleccionado) return;
   if (!confirm(`¿Liberar el asiento ${seleccionado}?`)) return;
 
-  const res = await db.from("asientos").delete().eq("asiento", seleccionado);
+  const res = await db.from(getTableName()).delete().eq("asiento", seleccionado);
   if (res.error) {
     console.error(res.error);
     alert("Error liberando: " + res.error.message);
