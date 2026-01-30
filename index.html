@@ -2,44 +2,70 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Mapa de Asientos</title>
+  <title>Mapa de Asientos Premium</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Sistema profesional de gestión de asientos en avión">
 
   <!-- Supabase SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles.css?v=11" />
+  <link rel="stylesheet" href="./styles.css?v=12" />
 </head>
 <body>
 
 <!-- LOGIN FULLSCREEN -->
-<section id="loginScreen" class="auth-screen">
+<section id="loginScreen" class="auth-screen" role="main">
   <div class="auth-card">
     <div class="auth-brand">
       <div class="auth-title">Mapa de Asientos</div>
-      <div class="auth-subtitle">Acceso para vendedor</div>
+      <div class="auth-subtitle">Sistema de gestión premium</div>
     </div>
 
-    <label class="auth-label">Email</label>
-    <input id="loginEmail" class="auth-input" placeholder="correo@empresa.com" autocomplete="username" />
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <label class="auth-label" for="loginEmail">Email</label>
+      <input 
+        id="loginEmail" 
+        class="auth-input" 
+        type="email"
+        placeholder="correo@empresa.com" 
+        autocomplete="username"
+        required
+        aria-required="true"
+      />
 
-    <div class="auth-row">
-      <label class="auth-label">Contraseña</label>
-      <a class="auth-forgot" href="#" onclick="return false;">¿Olvidaste tu contraseña?</a>
-    </div>
-    <input id="loginPass" class="auth-input" type="password" placeholder="••••••••" autocomplete="current-password" />
+      <div class="auth-row">
+        <label class="auth-label" for="loginPass">Contraseña</label>
+        <a class="auth-forgot" href="#" onclick="return false;" aria-label="Recuperar contraseña">¿Olvidaste tu contraseña?</a>
+      </div>
+      <input 
+        id="loginPass" 
+        class="auth-input" 
+        type="password" 
+        placeholder="••••••••" 
+        autocomplete="current-password"
+        required
+        aria-required="true"
+      />
 
-    <label class="auth-label">Selecciona el partido</label>
-    <select id="matchSelect" class="auth-input auth-select">
-      <option value="">— Seleccionar —</option>
-      <option value="PA-EN">Panamá VS Inglaterra</option>
-      <option value="PA-GH">Panamá VS Ghana</option>
-    </select>
+      <label class="auth-label" for="matchSelect">Selecciona el partido</label>
+      <select 
+        id="matchSelect" 
+        class="auth-input auth-select"
+        required
+        aria-required="true"
+      >
+        <option value="">– Seleccionar –</option>
+        <option value="PA-EN">Panamá VS Inglaterra</option>
+        <option value="PA-GH">Panamá VS Ghana</option>
+      </select>
 
+      <button type="submit" id="btnLogin" class="btn primary full" aria-label="Botón para ingresar">
+        <span>Entrar</span>
+        <div class="loader" id="loginLoader" style="display:none;"></div>
+      </button>
+    </form>
 
-    <button id="btnLogin" class="btn primary full">Entrar</button>
-
-    <div id="authError" class="auth-error" style="display:none;"></div>
+    <div id="authError" class="auth-error" role="alert" style="display:none;"></div>
 
     <div class="auth-foot">
       Usa el usuario creado en Supabase → Authentication → Users
@@ -48,123 +74,216 @@
 </section>
 
 <!-- APP -->
-<div id="app" class="layout" style="display:none;">
+<div id="app" class="layout" style="display:none;" role="main">
 
   <!-- MAPA -->
   <section class="seats">
-    <header class="topbar">
+    <header class="topbar" role="banner">
       <div class="brand">
-        <div class="title">CHARTER INGLATERRA</div>
+        <div class="title" id="matchTitle">CHARTER INGLATERRA</div>
         <div class="subtitle">Avión 3–3 · 189 puestos</div>
       </div>
 
-      <div class="stats">
-        <div class="stat"><span id="cLibre">0</span><small>Libres</small></div>
-        <!-- MISMO ID cPend, solo texto cambiado -->
-        <div class="stat"><span id="cPend">0</span><small>HOLD</small></div>
-        <div class="stat"><span id="cAbono">0</span><small>Abono</small></div>
-        <div class="stat"><span id="cPag">0</span><small>Pagado</small></div>
-              <div class="stat"><span id="cBloq">0</span><small>Bloqueo</small></div>
-</div>
+      <div class="stats" role="region" aria-label="Estadísticas de ocupación">
+        <div class="stat" title="Asientos disponibles">
+          <span id="cLibre">0</span>
+          <small>Libres</small>
+        </div>
+        <div class="stat" title="Asientos en reserva">
+          <span id="cPend">0</span>
+          <small>HOLD</small>
+        </div>
+        <div class="stat" title="Pagos parciales">
+          <span id="cAbono">0</span>
+          <small>Abono</small>
+        </div>
+        <div class="stat" title="Pagos completados">
+          <span id="cPag">0</span>
+          <small>Pagado</small>
+        </div>
+        <div class="stat" title="Asientos bloqueados">
+          <span id="cBloq">0</span>
+          <small>Bloqueo</small>
+        </div>
+      </div>
 
       <div class="controls">
-        <input id="search" class="search" placeholder="Buscar pasajero / documento / email…" />
-        <div class="filters">
-          <button class="chip active" data-filter="todos">Todos</button>
-          <button class="chip" data-filter="libre">Libre</button>
-          <!-- MISMA ESTRUCTURA, solo data-filter y texto -->
-          <button class="chip" data-filter="hold">HOLD</button>
-          <button class="chip" data-filter="abono">Abono</button>
-          <button class="chip" data-filter="pagado">Pagado</button>
-                  <button class="chip" data-filter="bloqueo">Bloqueo</button>
-</div>
+        <input 
+          id="search" 
+          class="search" 
+          type="text"
+          placeholder="Buscar pasajero / documento / email…"
+          aria-label="Campo de búsqueda de pasajeros"
+        />
+        <div class="filters" role="group" aria-label="Filtros de estado">
+          <button class="chip active" data-filter="todos" aria-pressed="true">Todos</button>
+          <button class="chip" data-filter="libre" aria-pressed="false">Libre</button>
+          <button class="chip" data-filter="hold" aria-pressed="false">HOLD</button>
+          <button class="chip" data-filter="abono" aria-pressed="false">Abono</button>
+          <button class="chip" data-filter="pagado" aria-pressed="false">Pagado</button>
+          <button class="chip" data-filter="bloqueo" aria-pressed="false">Bloqueo</button>
+        </div>
       </div>
 
       <div class="top-actions">
-        <button id="btnLogout" class="btn danger">Salir</button>
+        <button id="btnLogout" class="btn danger" aria-label="Cerrar sesión">Salir</button>
       </div>
     </header>
 
-    <div id="avion" class="grid"></div>
+    <div class="loading-spinner" id="loadingSpinner" role="status" aria-live="polite">
+      <div class="spinner"></div>
+      <p>Cargando asientos...</p>
+    </div>
+
+    <div id="avion" class="grid" role="region" aria-label="Mapa de asientos del avión"></div>
   </section>
 
   <!-- PANEL -->
-  <section class="panel">
+  <section class="panel" role="complementary">
     <div class="panel-head">
-      <h2>Asiento <span id="seatLabel">—</span></h2>
-      <button id="btnNuevo" class="btn ghost">➕ Nuevo</button>
+      <h2>Asiento <span id="seatLabel">–</span></h2>
+      <button id="btnNuevo" class="btn ghost" aria-label="Crear nuevo registro de asiento">➕ Nuevo</button>
     </div>
 
     <div class="panel-body">
-      <label>Nombre del pasajero</label>
-      <input id="nombre" autocomplete="off" />
+      <form id="seatForm">
+        <fieldset>
+          <legend>Información del Pasajero</legend>
+          
+          <label for="nombre">Nombre del pasajero <span class="required">*</span></label>
+          <input 
+            id="nombre" 
+            type="text"
+            autocomplete="off"
+            maxlength="100"
+            aria-required="false"
+          />
 
-      <label>Documento / Pasaporte</label>
-      <input id="documento" autocomplete="off" />
+          <label for="documento">Documento / Pasaporte <span class="required">*</span></label>
+          <input 
+            id="documento" 
+            type="text"
+            autocomplete="off"
+            maxlength="50"
+            aria-required="false"
+          />
 
-      <!-- ✅ CAMPO EMPRESA (ya lo tenías) -->
-      <label>Empresa</label>
-      <input id="empresa" autocomplete="off" />
+          <label for="empresa">Empresa</label>
+          <input 
+            id="empresa" 
+            type="text"
+            autocomplete="off"
+            maxlength="100"
+            aria-required="false"
+          />
 
-      <label>Teléfono</label>
-      <input id="telefono" autocomplete="off" />
+          <label for="telefono">Teléfono</label>
+          <input 
+            id="telefono" 
+            type="tel"
+            autocomplete="off"
+            pattern="[0-9+\-\s\(\)]+"
+            maxlength="20"
+            aria-required="false"
+          />
 
-      <label>Email</label>
-      <input id="email" autocomplete="off" />
+          <label for="email">Email</label>
+          <input 
+            id="email" 
+            type="email"
+            autocomplete="off"
+            maxlength="100"
+            aria-required="false"
+          />
+        </fieldset>
 
-      <hr />
+        <hr />
 
-      <label>Vendedor</label>
-      <input id="vendedor" autocomplete="off" />
+        <fieldset>
+          <legend>Información de Venta</legend>
 
-      <label>Precio</label>
-      <input id="precio" type="number" inputmode="decimal" />
+          <label for="vendedor">Vendedor</label>
+          <input 
+            id="vendedor" 
+            type="text"
+            autocomplete="off"
+            maxlength="100"
+            aria-required="false"
+          />
 
-      <label>Moneda</label>
-      <select id="moneda">
-        <option>USD</option>
-        <option>PAB</option>
-        <option>EUR</option>
-      </select>
+          <label for="precio">Precio</label>
+          <input 
+            id="precio" 
+            type="number" 
+            inputmode="decimal"
+            min="0"
+            max="99999.99"
+            step="0.01"
+            aria-required="false"
+          />
 
-      <label>Forma de pago</label>
-      <select id="formaPago">
-        <option>TC</option>
-        <option>Transferencia</option>
-        <option>Efectivo</option>
-        <option>Mixto</option>
-      </select>
+          <label for="moneda">Moneda</label>
+          <select id="moneda" aria-required="false">
+            <option>USD</option>
+            <option>PAB</option>
+            <option>EUR</option>
+          </select>
 
-      <label>Estado de pago</label>
-      <select id="estadoPago">
-        <option value="libre">LIBRE</option>
-        <!-- valor y texto cambiado -->
-        <option value="hold">HOLD</option>
-        <option value="abono">ABONO</option>
-        <option value="pagado">PAGADO</option>
-              <option value="bloqueo">BLOQUEO</option>
-</select>
+          <label for="formaPago">Forma de pago</label>
+          <select id="formaPago" aria-required="false">
+            <option>TC</option>
+            <option>Transferencia</option>
+            <option>Efectivo</option>
+            <option>Mixto</option>
+          </select>
 
-      <label>Fecha de pago</label>
-      <input id="fechaPago" type="date" />
+          <label for="estadoPago">Estado de pago <span class="required">*</span></label>
+          <select id="estadoPago" aria-required="true">
+            <option value="libre">LIBRE</option>
+            <option value="hold">HOLD</option>
+            <option value="abono">ABONO</option>
+            <option value="pagado">PAGADO</option>
+            <option value="bloqueo">BLOQUEO</option>
+          </select>
 
-      <label>Observaciones</label>
-      <input id="observaciones" autocomplete="off" />
+          <label for="fechaPago">Fecha de pago</label>
+          <input 
+            id="fechaPago" 
+            type="date"
+            aria-required="false"
+          />
 
-      <div class="actions">
-        <button id="btnGuardar" class="btn primary">💾 Guardar</button>
-        <button id="btnLiberar" class="btn danger">🗑 Liberar</button>
-      </div>
+          <label for="observaciones">Observaciones</label>
+          <input 
+            id="observaciones" 
+            type="text"
+            autocomplete="off"
+            maxlength="500"
+            aria-required="false"
+          />
+        </fieldset>
 
-      <button id="btnCSV" class="btn export">⬇ Exportar CSV</button>
+        <div class="actions">
+          <button type="button" id="btnGuardar" class="btn primary" aria-label="Guardar cambios">
+            <span>💾 Guardar</span>
+            <div class="loader" id="saveLoader" style="display:none;"></div>
+          </button>
+          <button type="button" id="btnLiberar" class="btn danger" aria-label="Liberar el asiento">
+            <span>🗑 Liberar</span>
+            <div class="loader" id="releaseLoader" style="display:none;"></div>
+          </button>
+        </div>
+
+        <button type="button" id="btnCSV" class="btn export" aria-label="Exportar datos a CSV">⬇ Exportar CSV</button>
+      </form>
 
       <p class="hint" id="hintSelect">Selecciona un asiento para editar y guardar.</p>
-      <p class="hint hint-ro" id="hintRO" style="display:none;">Modo solo lectura: no puedes editar.</p>
+      <p class="hint hint-ro" id="hintRO" style="display:none;">📖 Modo solo lectura: no puedes editar.</p>
     </div>
   </section>
 
 </div>
 
-<script src="./script.js?v=11"></script>
+<script src="./script.js?v=12"></script>
 </body>
 </html>

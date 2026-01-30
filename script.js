@@ -1,157 +1,260 @@
 /* =====================
-   SUPABASE (cambia aquí)
+   CONFIGURACIÓN (usar .env en producción)
 ===================== */
-const SUPABASE_URL  = "https://wzmucdhsjbfxjbxvzlxo.supabase.co";  // <-- cambia
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";              // <-- cambia
+// Para producción, usar variables de entorno:
+// const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '...';
+// const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON || '...';
 
-// ⚠️ No declares `supabase` para evitar: Identifier 'supabase' has already been declared
+const SUPABASE_URL = "https://wzmucdhsjbfxjbxvzlxo.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";
+
+// ⚠️ IMPORTANTE: En producción, nunca hardcodees credenciales.
+// Usa un backend seguro o variables de entorno.
+
 if (!window.supabase) {
-  alert("No se cargó el SDK de Supabase. Revisa el <script src='https://unpkg.com/@supabase/supabase-js@2'>");
+  alert("❌ No se cargó el SDK de Supabase. Revisa el script src.");
 }
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /* =====================
-   CONFIG
+   CONSTANTES
 ===================== */
 const TOTAL_ASIENTOS = 189;
-const columnas = ["A","B","C","D","E","F"];
+const columnas = ["A", "B", "C", "D", "E", "F"];
 
-// ✅ Incluye empresa
 const fields = [
-  "nombre","documento","empresa","telefono","email",
-  "vendedor","precio","moneda",
-  "formaPago","estadoPago","fechaPago","observaciones"
+  "nombre", "documento", "empresa", "telefono", "email",
+  "vendedor", "precio", "moneda",
+  "formaPago", "estadoPago", "fechaPago", "observaciones"
 ];
 
+const VALIDATION_RULES = {
+  nombre: { required: false, maxLength: 100 },
+  documento: { required: false, maxLength: 50 },
+  empresa: { required: false, maxLength: 100 },
+  telefono: { required: false, maxLength: 20, pattern: /^[0-9+\-\s\(\)]*$/ },
+  email: { required: false, type: "email" },
+  vendedor: { required: false, maxLength: 100 },
+  precio: { required: false, min: 0, max: 99999.99 },
+  moneda: { required: false },
+  formaPago: { required: false },
+  estadoPago: { required: true },
+  fechaPago: { required: false, type: "date" },
+  observaciones: { required: false, maxLength: 500 }
+};
+
 /* =====================
-   UI refs
+   UI REFS
 ===================== */
 const loginScreen = document.getElementById("loginScreen");
+const loginForm = document.getElementById("loginForm");
 const app = document.getElementById("app");
-
 const loginEmail = document.getElementById("loginEmail");
 const loginPass = document.getElementById("loginPass");
 const matchSelect = document.getElementById("matchSelect");
 const btnLogin = document.getElementById("btnLogin");
-const btnLogout = document.getElementById("btnLogout");
+const loginLoader = document.getElementById("loginLoader");
 const authError = document.getElementById("authError");
 
 const avion = document.getElementById("avion");
 const seatLabel = document.getElementById("seatLabel");
 const hintSelect = document.getElementById("hintSelect");
 const hintRO = document.getElementById("hintRO");
+const loadingSpinner = document.getElementById("loadingSpinner");
 
 const searchInput = document.getElementById("search");
 const chips = Array.from(document.querySelectorAll(".chip"));
 
 const cLibre = document.getElementById("cLibre");
-const cPend  = document.getElementById("cPend"); // (MISMO ID) ahora cuenta HOLD
+const cPend = document.getElementById("cPend");
 const cAbono = document.getElementById("cAbono");
-const cPag   = document.getElementById("cPag");
+const cPag = document.getElementById("cPag");
 const cBloq = document.getElementById("cBloq");
 
+const btnLogout = document.getElementById("btnLogout");
 const btnNuevo = document.getElementById("btnNuevo");
 const btnGuardar = document.getElementById("btnGuardar");
 const btnLiberar = document.getElementById("btnLiberar");
 const btnCSV = document.getElementById("btnCSV");
+const seatForm = document.getElementById("seatForm");
+const matchTitle = document.getElementById("matchTitle");
 
+const saveLoader = document.getElementById("saveLoader");
+const releaseLoader = document.getElementById("releaseLoader");
+
+/* =====================
+   STATE
+===================== */
 let seleccionado = null;
 let data = {};
 let filterEstado = "todos";
 let searchText = "";
 let isReadOnly = false;
+let currentSession = null;
 
 /* =====================
-   Helpers estado (compat)
-   - si viene "pendiente" => lo tratamos como "hold"
+   HELPERS: ESTADO
 ===================== */
-function normalizeEstado(e){
+function normalizeEstado(e) {
   const x = (e || "libre").toString().toLowerCase();
   return x === "pendiente" ? "hold" : x;
 }
 
+function estadoLabel(e) {
+  const st = normalizeEstado(e);
+  const labels = {
+    "pagado": "PAGADO",
+    "abono": "ABONO",
+    "hold": "HOLD",
+    "bloqueo": "BLOQUEO",
+    "libre": "LIBRE"
+  };
+  return labels[st] || "LIBRE";
+}
+
 /* =====================
-   Auth helpers
+   HELPERS: VALIDACIÓN
 ===================== */
-function showError(msg){
+function validateField(fieldName, value) {
+  const rule = VALIDATION_RULES[fieldName];
+  if (!rule) return { valid: true };
+
+  // Requerido
+  if (rule.required && !value) {
+    return { valid: false, message: `${fieldName} es requerido` };
+  }
+
+  // Vacío permitido si no es requerido
+  if (!value) return { valid: true };
+
+  // Máximo de caracteres
+  if (rule.maxLength && value.length > rule.maxLength) {
+    return { valid: false, message: `${fieldName} no puede exceder ${rule.maxLength} caracteres` };
+  }
+
+  // Pattern
+  if (rule.pattern && !rule.pattern.test(value)) {
+    return { valid: false, message: `${fieldName} tiene formato inválido` };
+  }
+
+  // Email
+  if (rule.type === "email" && value) {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(value)) {
+      return { valid: false, message: "Email inválido" };
+    }
+  }
+
+  // Date
+  if (rule.type === "date" && value) {
+    if (isNaN(Date.parse(value))) {
+      return { valid: false, message: "Fecha inválida" };
+    }
+  }
+
+  // Número
+  if (typeof rule.min !== "undefined" || typeof rule.max !== "undefined") {
+    const num = Number(value);
+    if (isNaN(num)) {
+      return { valid: false, message: `${fieldName} debe ser un número` };
+    }
+    if (typeof rule.min !== "undefined" && num < rule.min) {
+      return { valid: false, message: `${fieldName} no puede ser menor a ${rule.min}` };
+    }
+    if (typeof rule.max !== "undefined" && num > rule.max) {
+      return { valid: false, message: `${fieldName} no puede ser mayor a ${rule.max}` };
+    }
+  }
+
+  return { valid: true };
+}
+
+function validateForm() {
+  const errors = [];
+  fields.forEach(f => {
+    const el = document.getElementById(f);
+    if (!el) return;
+    const validation = validateField(f, el.value);
+    if (!validation.valid) {
+      errors.push(validation.message);
+    }
+  });
+  return errors;
+}
+
+/* =====================
+   HELPERS: UI
+===================== */
+function showError(msg) {
   authError.style.display = msg ? "block" : "none";
   authError.textContent = msg || "";
 }
-function setMode(logged){
+
+function setMode(logged) {
   loginScreen.style.display = logged ? "none" : "flex";
   app.style.display = logged ? "grid" : "none";
 }
 
-/* =====================
-   Partido seleccionado (login)
-===================== */
-function applyMatchTitle(){
-  const v = sessionStorage.getItem("match") || "";
-  const titleEl = document.querySelector(".brand .title");
-  if (!titleEl) return;
-
-  if (v === "PA-EN") titleEl.textContent = "PANAMÁ VS INGLATERRA";
-  else if (v === "PA-GH") titleEl.textContent = "PANAMÁ VS GHANA";
-  else titleEl.textContent = "CHARTER";
+function showLoader(loader, show = true) {
+  if (loader) loader.style.display = show ? "flex" : "none";
 }
 
-// ✅ Tabla dinámica según partido
-function getTableName(){
+function showLoadingSpinner(show = true) {
+  loadingSpinner.style.display = show ? "flex" : "none";
+}
+
+function applyMatchTitle() {
+  const v = sessionStorage.getItem("match") || "";
+  if (v === "PA-EN") matchTitle.textContent = "PANAMÁ VS INGLATERRA";
+  else if (v === "PA-GH") matchTitle.textContent = "PANAMÁ VS GHANA";
+  else matchTitle.textContent = "CHARTER";
+}
+
+function getTableName() {
   const m = sessionStorage.getItem("match") || "";
   return (m === "PA-GH") ? "asientos_ghana" : "asientos";
 }
 
-async function getSession(){
+/* =====================
+   SESSION & ROLES
+===================== */
+async function getSession() {
   const { data: s } = await db.auth.getSession();
   return s.session;
 }
 
-/* =====================
-   ROLES (EDITOR / VIEWER)
-===================== */
-function applyRole(session){
+function applyRole(session) {
   const role = session?.user?.user_metadata?.role || "editor";
   isReadOnly = (role === "viewer");
+  currentSession = session;
 
-  // marca visual + bloqueo
   app.classList.toggle("readonly", isReadOnly);
   if (hintRO) hintRO.style.display = isReadOnly ? "block" : "none";
   if (hintSelect) hintSelect.style.display = (!seleccionado && !isReadOnly) ? "block" : "none";
 
-  // botones
   btnGuardar.disabled = isReadOnly || !seleccionado;
   btnLiberar.disabled = isReadOnly || !seleccionado;
   btnNuevo.disabled = isReadOnly;
 
-  // inputs/selects del panel (bloqueo fuerte)
-  fields.forEach(f=>{
+  fields.forEach(f => {
     const el = document.getElementById(f);
     if (el) el.disabled = isReadOnly;
   });
 }
 
 /* =====================
-   UI helpers
+   FORM HELPERS
 ===================== */
-function estadoLabel(e){
-  const st = normalizeEstado(e);
-  return st === "pagado" ? "PAGADO" :
-         st === "abono" ? "ABONO" :
-         st === "hold" ? "HOLD" :
-         st === "bloqueo" ? "BLOQUEO" : "LIBRE";
-}
-function limpiarFormulario(){
+function limpiarFormulario() {
   fields.forEach(f => {
     const el = document.getElementById(f);
     if (el) el.value = "";
   });
 }
-function actualizarHint(){
+
+function actualizarHint() {
   if (isReadOnly) {
     hintSelect.style.display = "none";
-    btnGuardar.disabled = true;
-    btnLiberar.disabled = true;
-    btnNuevo.disabled = true;
     return;
   }
   hintSelect.style.display = seleccionado ? "none" : "block";
@@ -161,12 +264,8 @@ function actualizarHint(){
   btnLiberar.style.opacity = seleccionado ? "1" : ".55";
 }
 
-
-/* =====================
-   BLOQUEO: permitir click pero bloquear edición
-===================== */
-function applySeatFormLock(){
-  if (isReadOnly) return; // viewer ya bloquea todo
+function applySeatFormLock() {
+  if (isReadOnly) return;
 
   const estadoActual = normalizeEstado(data[seleccionado]?.estadoPago || "libre");
   const isBloqueo = (estadoActual === "bloqueo");
@@ -179,24 +278,52 @@ function applySeatFormLock(){
 
   const ep = document.getElementById("estadoPago");
   if (ep) ep.disabled = false; // siempre permite cambiar estado
-
+  
   if (hintRO) hintRO.style.display = isBloqueo ? "block" : "none";
 }
 
-
-function matchSearch(info){
+/* =====================
+   SEARCH & FILTER
+===================== */
+function matchSearch(info) {
   if (!searchText) return true;
   const hay = [
     info?.nombre, info?.documento, info?.empresa, info?.email, info?.telefono, info?.vendedor
   ].filter(Boolean).join(" ").toLowerCase();
   return hay.includes(searchText);
 }
-function matchFilter(info){
+
+function matchFilter(info) {
   if (filterEstado === "todos") return true;
   const estado = normalizeEstado(info?.estadoPago || "libre");
   return estado === filterEstado;
 }
-function updateStats(){
+
+function saveFilterState() {
+  sessionStorage.setItem("filter", filterEstado);
+  sessionStorage.setItem("search", searchText);
+}
+
+function restoreFilterState() {
+  const saved = sessionStorage.getItem("filter");
+  if (saved) {
+    filterEstado = saved;
+    chips.forEach(c => {
+      c.classList.toggle("active", c.dataset.filter === saved);
+      c.setAttribute("aria-pressed", c.dataset.filter === saved);
+    });
+  }
+  const savedSearch = sessionStorage.getItem("search");
+  if (savedSearch) {
+    searchText = savedSearch;
+    searchInput.value = savedSearch;
+  }
+}
+
+/* =====================
+   ESTADÍSTICAS
+===================== */
+function updateStats() {
   let libre = 0, hold = 0, abono = 0, pag = 0, bloq = 0;
 
   for (let fila = 1, count = 0; count < TOTAL_ASIENTOS; fila++) {
@@ -214,44 +341,48 @@ function updateStats(){
   }
 
   cLibre.textContent = libre;
-  cPend.textContent = hold; // (MISMO ID) ahora muestra HOLD
+  cPend.textContent = hold;
   cAbono.textContent = abono;
   cPag.textContent = pag;
   if (cBloq) cBloq.textContent = bloq;
 }
 
 /* =====================
-   Render asientos (avión)
+   RENDER ASIENTOS
 ===================== */
-function crearAsiento(id){
+function crearAsiento(id) {
   const info = data[id] || {};
   const seat = document.createElement("div");
 
   const estado = normalizeEstado(info.estadoPago || "libre");
   seat.className = `asiento ${estado}`;
 
+  const visible = matchSearch(info) && matchFilter(info);
+  seat.style.opacity = visible ? "1" : ".18";
+  seat.style.pointerEvents = visible ? "auto" : "none";
+
   seat.innerHTML = `
     <div class="top">
       <span><span class="dot"></span>${id}</span>
       <span>${estadoLabel(estado)}</span>
     </div>
-    <div class="name">${info.nombre || "—"}</div>
-    <div class="empresa">${info.empresa || "—"}</div>
+    <div class="name">${info.nombre || "–"}</div>
+    <div class="empresa">${info.empresa || "–"}</div>
   `;
-
-  const visible = matchSearch(info) && matchFilter(info);
-  seat.style.opacity = visible ? "1" : ".18";
-  seat.style.pointerEvents = visible ? "auto" : "none";
 
   if (estado === "bloqueo") {
     seat.classList.add("disabled");
-    seat.style.cursor = "not-allowed";
   }
+
   seat.onclick = () => selectSeat(id, seat);
+  seat.setAttribute("role", "button");
+  seat.setAttribute("tabindex", visible ? "0" : "-1");
+  seat.setAttribute("aria-label", `Asiento ${id}: ${estadoLabel(estado)} - ${info.nombre || "Disponible"}`);
+
   return seat;
 }
 
-function render(){
+function render() {
   avion.innerHTML = "";
   let count = 0;
   let fila = 1;
@@ -277,167 +408,264 @@ function render(){
   actualizarHint();
 }
 
-function selectSeat(id, el){
+function selectSeat(id, el) {
   document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
 
   seleccionado = id;
   el.classList.add("seleccionado");
+  el.focus();
   seatLabel.textContent = id;
 
   fields.forEach(f => {
     const input = document.getElementById(f);
     if (!input) return;
-
-    // compat: si lo guardado es "pendiente" lo mostramos como "hold"
-    if (f === "estadoPago") input.value = normalizeEstado(data[id]?.[f] ?? "");
+    if (f === "estadoPago") input.value = normalizeEstado(data[id]?.[f] ?? "libre");
     else input.value = data[id]?.[f] ?? "";
   });
+
   applySeatFormLock();
   actualizarHint();
 }
 
 /* =====================
-   Supabase CRUD
+   SUPABASE CRUD
 ===================== */
-async function cargarDesdeSupabase(){
-  const session = await getSession();
-  if (!session) {
-    data = {};
-    render();
-    return;
-  }
-
-  const res = await db.from(getTableName()).select("*");
-  if (res.error) {
-    console.error(res.error);
-    alert("Error cargando: " + res.error.message);
-    return;
-  }
-
-  data = {};
-  (res.data || []).forEach(r => {
-    // normalizamos al cargar
-    if (r && typeof r === "object") {
-      r.estadoPago = normalizeEstado(r.estadoPago);
+async function cargarDesdeSupabase() {
+  showLoadingSpinner(true);
+  try {
+    const session = await getSession();
+    if (!session) {
+      data = {};
+      render();
+      showLoadingSpinner(false);
+      return;
     }
-    data[r.asiento] = r;
-  });
 
-  render();
+    const res = await db.from(getTableName()).select("*");
+    if (res.error) {
+      console.error("❌ Error cargando:", res.error);
+      alert("Error cargando datos: " + res.error.message);
+      showLoadingSpinner(false);
+      return;
+    }
+
+    data = {};
+    (res.data || []).forEach(r => {
+      if (r && typeof r === "object") {
+        r.estadoPago = normalizeEstado(r.estadoPago);
+      }
+      data[r.asiento] = r;
+    });
+
+    render();
+    restoreFilterState();
+  } catch (err) {
+    console.error("❌ Error:", err);
+  } finally {
+    showLoadingSpinner(false);
+  }
 }
 
-async function guardarEnSupabase(){
-  if (isReadOnly) return alert("Este usuario es solo lectura.");
+async function guardarEnSupabase() {
+  if (isReadOnly) return alert("❌ Este usuario es solo lectura.");
   const session = await getSession();
-  if (!session) return alert("Debes iniciar sesión.");
-  if (!seleccionado) return alert("Selecciona un asiento");
+  if (!session) return alert("❌ Debes iniciar sesión.");
+  if (!seleccionado) return alert("❌ Selecciona un asiento");
 
-  const payload = { asiento: seleccionado };
-
-  fields.forEach(f => {
-    const el = document.getElementById(f);
-    payload[f] = el ? (el.value || null) : null;
-  });
-
-  // precio a número
-  if (payload.precio !== null && payload.precio !== "") {
-    const n = Number(payload.precio);
-    payload.precio = Number.isFinite(n) ? n : null;
-  } else payload.precio = null;
-
-  // ✅ default ahora es HOLD
-  if (!payload.estadoPago) payload.estadoPago = "hold";
-
-  // compat: si por error llega "pendiente", lo convertimos
-  payload.estadoPago = normalizeEstado(payload.estadoPago);
-
-  const res = await db.from(getTableName()).upsert(payload).select().single();
-  if (res.error) {
-    console.error(res.error);
-    alert("Error guardando: " + res.error.message);
+  // Validar
+  const errors = validateForm();
+  if (errors.length > 0) {
+    alert("❌ Errores de validación:\n" + errors.join("\n"));
     return;
   }
 
-  // normaliza lo que vuelve
-  res.data.estadoPago = normalizeEstado(res.data.estadoPago);
+  showLoader(saveLoader, true);
 
-  data[seleccionado] = res.data;
-  render();
+  try {
+    const payload = { asiento: seleccionado };
+
+    fields.forEach(f => {
+      const el = document.getElementById(f);
+      payload[f] = el ? (el.value || null) : null;
+    });
+
+    // Precio a número
+    if (payload.precio !== null && payload.precio !== "") {
+      const n = Number(payload.precio);
+      payload.precio = Number.isFinite(n) ? n : null;
+    } else {
+      payload.precio = null;
+    }
+
+    // Default HOLD
+    if (!payload.estadoPago) payload.estadoPago = "hold";
+    payload.estadoPago = normalizeEstado(payload.estadoPago);
+
+    // Auditoría - REMOVIDA para ahorrar espacio en BD
+    // payload.updated_at = new Date().toISOString();
+    // payload.updated_by = session.user.email;
+
+    // Detección de conflictos - REMOVIDA (requería auditoría)
+    // const lastSync = lastSyncTime[seleccionado];
+    // if (lastSync && data[seleccionado]?.updated_at > lastSync) {
+    //   showConflictModal(seleccionado);
+    //   showLoader(saveLoader, false);
+    //   return;
+    // }
+
+    const res = await db.from(getTableName()).upsert(payload).select().single();
+    if (res.error) {
+      console.error("❌ Error guardando:", res.error);
+      alert("Error guardando: " + res.error.message);
+      showLoader(saveLoader, false);
+      return;
+    }
+
+    res.data.estadoPago = normalizeEstado(res.data.estadoPago);
+    data[seleccionado] = res.data;
+
+    // Feedback visual
+    const savedAlert = document.createElement("div");
+    savedAlert.textContent = "✅ Guardado exitosamente";
+    savedAlert.style.cssText = "position:fixed;top:20px;right:20px;background:#22c55e;color:white;padding:12px 16px;border-radius:8px;z-index:1001;animation:slideUp 0.3s ease-out;";
+    document.body.appendChild(savedAlert);
+    setTimeout(() => savedAlert.remove(), 3000);
+
+    render();
+    
+    // Re-seleccionar el asiento después de renderizar por ID único
+    if (seleccionado) {
+      // Buscar el asiento nuevo por su ID que está en el contenedor
+      const asientos = document.querySelectorAll(".asiento");
+      let encontrado = null;
+      
+      for (let seat of asientos) {
+        // El ID del asiento está en el text content del .top span
+        if (seat.textContent.includes(seleccionado)) {
+          encontrado = seat;
+          break;
+        }
+      }
+      
+      if (encontrado) {
+        selectSeat(seleccionado, encontrado);
+      }
+    }
+  } catch (err) {
+    console.error("❌ Error:", err);
+    alert("Error: " + err.message);
+  } finally {
+    showLoader(saveLoader, false);
+  }
 }
 
-async function liberarEnSupabase(){
-  if (isReadOnly) return alert("Este usuario es solo lectura.");
+async function liberarEnSupabase() {
+  if (isReadOnly) return alert("❌ Este usuario es solo lectura.");
   const session = await getSession();
-  if (!session) return alert("Debes iniciar sesión.");
+  if (!session) return alert("❌ Debes iniciar sesión.");
   if (!seleccionado) return;
   if (!confirm(`¿Liberar el asiento ${seleccionado}?`)) return;
 
-  const res = await db.from(getTableName()).delete().eq("asiento", seleccionado);
-  if (res.error) {
-    console.error(res.error);
-    alert("Error liberando: " + res.error.message);
-    return;
-  }
+  showLoader(releaseLoader, true);
 
-  delete data[seleccionado];
-  limpiarFormulario();
-  seatLabel.textContent = "—";
-  seleccionado = null;
-  render();
+  try {
+    const res = await db.from(getTableName()).delete().eq("asiento", seleccionado);
+    if (res.error) {
+      console.error("❌ Error liberando:", res.error);
+      alert("Error liberando: " + res.error.message);
+      showLoader(releaseLoader, false);
+      return;
+    }
+
+    delete data[seleccionado];
+    limpiarFormulario();
+    seatLabel.textContent = "–";
+    seleccionado = null;
+
+    // Feedback visual
+    const freedAlert = document.createElement("div");
+    freedAlert.textContent = "✅ Asiento liberado";
+    freedAlert.style.cssText = "position:fixed;top:20px;right:20px;background:#22c55e;color:white;padding:12px 16px;border-radius:8px;z-index:1001;animation:slideUp 0.3s ease-out;";
+    document.body.appendChild(freedAlert);
+    setTimeout(() => freedAlert.remove(), 3000);
+
+    render();
+  } catch (err) {
+    console.error("❌ Error:", err);
+    alert("Error: " + err.message);
+  } finally {
+    showLoader(releaseLoader, false);
+  }
 }
 
 /* =====================
-   CSV
+   CSV EXPORT
 ===================== */
-function exportCSV(){
+function exportCSV() {
   const headers = ["asiento", ...fields];
   const rows = [headers.join(",")];
 
   for (const a in data) {
     const row = [a, ...fields.map(f => {
       let v = (data[a]?.[f] ?? "");
-      // compat: exporta HOLD si había pendiente
       if (f === "estadoPago") v = normalizeEstado(v);
-      return v.toString().replace(/"/g,'""');
+      return v.toString().replace(/"/g, '""');
     })].map(v => `"${v}"`);
 
     rows.push(row.join(","));
   }
 
-  const blob = new Blob([rows.join("\n")], { type:"text/csv;charset=utf-8" });
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "asientos.csv";
+  link.download = `asientos_${new Date().toISOString().split('T')[0]}.csv`;
   link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 /* =====================
-   Eventos
+   EVENT HANDLERS
 ===================== */
-btnLogin.addEventListener("click", async () => {
+async function handleLogin(e) {
+  e.preventDefault();
   showError("");
 
   const email = (loginEmail.value || "").trim();
   const password = loginPass.value || "";
 
-  if (!email || !password) return showError("Completa email y contraseña.");
+  if (!email || !password) return showError("❌ Completa email y contraseña.");
 
   const match = (matchSelect?.value || "").trim();
-  if (!match) return showError("Selecciona el partido.");
-  sessionStorage.setItem("match", match);
+  if (!match) return showError("❌ Selecciona el partido.");
 
-  const { data: auth, error } = await db.auth.signInWithPassword({ email, password });
-  if (error) return showError(error.message);
+  showLoader(loginLoader, true);
 
-  setMode(true);
-  applyMatchTitle();
-  applyRole(auth.session);
-  await cargarDesdeSupabase();
-});
+  try {
+    sessionStorage.setItem("match", match);
+
+    const { data: auth, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) return showError("❌ " + error.message);
+
+    setMode(true);
+    applyMatchTitle();
+    applyRole(auth.session);
+    await cargarDesdeSupabase();
+
+    // Limpiar form
+    loginForm.reset();
+  } catch (err) {
+    console.error("❌ Error:", err);
+    showError("❌ Error de login: " + err.message);
+  } finally {
+    showLoader(loginLoader, false);
+  }
+}
 
 btnLogout.addEventListener("click", async () => {
   await db.auth.signOut();
   sessionStorage.removeItem("match");
+  sessionStorage.removeItem("filter");
+  sessionStorage.removeItem("search");
   if (matchSelect) matchSelect.value = "";
   applyMatchTitle();
   seleccionado = null;
@@ -445,6 +673,7 @@ btnLogout.addEventListener("click", async () => {
   app.classList.remove("readonly");
   setMode(false);
   limpiarFormulario();
+  data = {};
 });
 
 btnGuardar.addEventListener("click", guardarEnSupabase);
@@ -454,7 +683,7 @@ btnNuevo.addEventListener("click", () => {
   if (isReadOnly) return;
   seleccionado = null;
   document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
-  seatLabel.textContent = "—";
+  seatLabel.textContent = "–";
   limpiarFormulario();
   if (hintRO) hintRO.style.display = "none";
   fields.forEach(f => {
@@ -466,41 +695,72 @@ btnNuevo.addEventListener("click", () => {
 
 searchInput.addEventListener("input", (e) => {
   searchText = (e.target.value || "").trim().toLowerCase();
+  saveFilterState();
   render();
 });
 
 chips.forEach(chip => {
   chip.addEventListener("click", () => {
-    chips.forEach(c => c.classList.remove("active"));
+    chips.forEach(c => {
+      c.classList.remove("active");
+      c.setAttribute("aria-pressed", "false");
+    });
     chip.classList.add("active");
+    chip.setAttribute("aria-pressed", "true");
     filterEstado = chip.dataset.filter;
+    saveFilterState();
     render();
   });
 });
 
 btnCSV.addEventListener("click", exportCSV);
 
+// Naveg con teclado
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (seleccionado) {
+      seleccionado = null;
+      document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
+      limpiarFormulario();
+      actualizarHint();
+    }
+  }
+});
+
 /* =====================
    INIT
 ===================== */
 (async () => {
-  const { data: s } = await db.auth.getSession();
-  const logged = !!s.session;
+  try {
+    const { data: s } = await db.auth.getSession();
+    const logged = !!s.session;
 
-  setMode(logged);
-  render();
+    setMode(logged);
+    render();
 
-  if (logged) {
-    applyRole(s.session);
-    await cargarDesdeSupabase();
-  }
-
-  db.auth.onAuthStateChange((_event, session) => {
-    setMode(!!session);
-    if (session) {
-      applyRole(session);
-      cargarDesdeSupabase();
+    if (logged) {
+      applyRole(s.session);
+      await cargarDesdeSupabase();
     }
-  });
-  actualizarHint();
+
+    db.auth.onAuthStateChange((_event, session) => {
+      setMode(!!session);
+      if (session) {
+        applyRole(session);
+        cargarDesdeSupabase();
+      }
+    });
+
+    actualizarHint();
+  } catch (err) {
+    console.error("❌ Init error:", err);
+  }
 })();
+
+/* =====================
+   SERVICE WORKER (opcional para PWA)
+===================== */
+if ("serviceWorker" in navigator) {
+  // Descomenta si implementas un service worker
+  // navigator.serviceWorker.register("/sw.js").catch(e => console.log("SW error:", e));
+}
