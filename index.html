@@ -9,7 +9,7 @@
   <!-- Supabase SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles.css?v=12" />
+  <link rel="stylesheet" href="./styles.css?v=13" />
 </head>
 <body>
 
@@ -54,7 +54,7 @@
         required
         aria-required="true"
       >
-        <option value="">– Seleccionar –</option>
+        <option value="">— Seleccionar —</option>
         <option value="PA-EN">Panamá VS Inglaterra</option>
         <option value="PA-GH">Panamá VS Ghana</option>
       </select>
@@ -81,7 +81,7 @@
     <header class="topbar" role="banner">
       <div class="brand">
         <div class="title" id="matchTitle">CHARTER INGLATERRA</div>
-        <div class="subtitle">Avión 3–3 · 189 puestos</div>
+        <div class="subtitle">Avión 3—3 · 189 puestos</div>
       </div>
 
       <div class="stats" role="region" aria-label="Estadísticas de ocupación">
@@ -141,11 +141,26 @@
   <!-- PANEL -->
   <section class="panel" role="complementary">
     <div class="panel-head">
-      <h2>Asiento <span id="seatLabel">–</span></h2>
+      <h2>
+        <span id="singleSeatLabel">Asiento <span id="seatLabel">—</span></span>
+        <span id="multiSeatLabel" style="display:none;">
+          <span id="multiCount">0</span> Asientos Seleccionados
+        </span>
+      </h2>
       <button id="btnNuevo" class="btn ghost" aria-label="Crear nuevo registro de asiento">➕ Nuevo</button>
     </div>
 
     <div class="panel-body">
+      <!-- Badge de selección múltiple -->
+      <div id="multiSelectBadge" class="multi-select-badge" style="display:none;">
+        <div class="badge-header">
+          <span>🎯 Modo Selección Múltiple</span>
+          <button id="btnClearMulti" class="btn-clear-multi" aria-label="Limpiar selección">✕</button>
+        </div>
+        <div id="selectedSeatsDisplay" class="selected-seats-display"></div>
+        <p class="badge-hint">Los datos se guardarán en todos los asientos seleccionados</p>
+      </div>
+
       <form id="seatForm">
         <fieldset>
           <legend>Información del Pasajero</legend>
@@ -265,11 +280,11 @@
 
         <div class="actions">
           <button type="button" id="btnGuardar" class="btn primary" aria-label="Guardar cambios">
-            <span>💾 Guardar</span>
+            <span id="btnGuardarText">💾 Guardar</span>
             <div class="loader" id="saveLoader" style="display:none;"></div>
           </button>
           <button type="button" id="btnLiberar" class="btn danger" aria-label="Liberar el asiento">
-            <span>🗑 Liberar</span>
+            <span id="btnLiberarText">🗑 Liberar</span>
             <div class="loader" id="releaseLoader" style="display:none;"></div>
           </button>
         </div>
@@ -277,13 +292,16 @@
         <button type="button" id="btnCSV" class="btn export" aria-label="Exportar datos a CSV">⬇ Exportar CSV</button>
       </form>
 
-      <p class="hint" id="hintSelect">Selecciona un asiento para editar y guardar.</p>
+      <p class="hint" id="hintSelect">
+        Selecciona un asiento para editar.<br>
+        <strong>Mantén Ctrl/Cmd</strong> para seleccionar múltiples asientos.
+      </p>
       <p class="hint hint-ro" id="hintRO" style="display:none;">📖 Modo solo lectura: no puedes editar.</p>
     </div>
   </section>
 
 </div>
 
-<script src="./script.js?v=12"></script>
+<script src="./script.js?v=13"></script>
 </body>
 </html>

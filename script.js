@@ -1,10 +1,6 @@
 /* =====================
    CONFIGURACIÓN (usar .env en producción)
 ===================== */
-// Para producción, usar variables de entorno:
-// const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '...';
-// const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON || '...';
-
 const SUPABASE_URL = "https://wzmucdhsjbfxjbxvzlxo.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6bXVjZGhzamJmeGpieHZ6bHhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4NjE4MTQsImV4cCI6MjA4NDQzNzgxNH0.GdUH59h2CUKBp3Z2ZASkFZdvSjI-HIOLWxlv49ykiAI";
 
@@ -58,6 +54,9 @@ const authError = document.getElementById("authError");
 
 const avion = document.getElementById("avion");
 const seatLabel = document.getElementById("seatLabel");
+const singleSeatLabel = document.getElementById("singleSeatLabel");
+const multiSeatLabel = document.getElementById("multiSeatLabel");
+const multiCount = document.getElementById("multiCount");
 const hintSelect = document.getElementById("hintSelect");
 const hintRO = document.getElementById("hintRO");
 const loadingSpinner = document.getElementById("loadingSpinner");
@@ -74,7 +73,9 @@ const cBloq = document.getElementById("cBloq");
 const btnLogout = document.getElementById("btnLogout");
 const btnNuevo = document.getElementById("btnNuevo");
 const btnGuardar = document.getElementById("btnGuardar");
+const btnGuardarText = document.getElementById("btnGuardarText");
 const btnLiberar = document.getElementById("btnLiberar");
+const btnLiberarText = document.getElementById("btnLiberarText");
 const btnCSV = document.getElementById("btnCSV");
 const seatForm = document.getElementById("seatForm");
 const matchTitle = document.getElementById("matchTitle");
@@ -82,10 +83,16 @@ const matchTitle = document.getElementById("matchTitle");
 const saveLoader = document.getElementById("saveLoader");
 const releaseLoader = document.getElementById("releaseLoader");
 
+// Multi-select UI
+const multiSelectBadge = document.getElementById("multiSelectBadge");
+const selectedSeatsDisplay = document.getElementById("selectedSeatsDisplay");
+const btnClearMulti = document.getElementById("btnClearMulti");
+
 /* =====================
    STATE
 ===================== */
 let seleccionado = null;
+let selectedSeats = new Set(); // Para selección múltiple
 let data = {};
 let filterEstado = "todos";
 let searchText = "";
@@ -216,6 +223,58 @@ function getTableName() {
 }
 
 /* =====================
+   MULTI-SELECT UI
+===================== */
+function updateMultiSelectUI() {
+  const isMulti = selectedSeats.size > 0;
+  
+  if (isMulti) {
+    // Mostrar badge de selección múltiple
+    multiSelectBadge.style.display = "block";
+    multiCount.textContent = selectedSeats.size;
+    multiSeatLabel.style.display = "block";
+    singleSeatLabel.style.display = "none";
+    
+    // Actualizar texto de botones
+    btnGuardarText.textContent = `💾 Guardar en ${selectedSeats.size} asiento(s)`;
+    btnLiberarText.textContent = `🗑 Liberar ${selectedSeats.size} asiento(s)`;
+    
+    // Mostrar chips de asientos seleccionados
+    selectedSeatsDisplay.innerHTML = "";
+    const sortedSeats = Array.from(selectedSeats).sort((a, b) => {
+      const numA = parseInt(a);
+      const numB = parseInt(b);
+      if (numA !== numB) return numA - numB;
+      return a.localeCompare(b);
+    });
+    
+    sortedSeats.forEach(seatId => {
+      const chip = document.createElement("span");
+      chip.className = "seat-chip";
+      chip.textContent = seatId;
+      selectedSeatsDisplay.appendChild(chip);
+    });
+  } else {
+    // Modo selección individual
+    multiSelectBadge.style.display = "none";
+    multiSeatLabel.style.display = "none";
+    singleSeatLabel.style.display = "block";
+    btnGuardarText.textContent = "💾 Guardar";
+    btnLiberarText.textContent = "🗑 Liberar";
+  }
+  
+  actualizarHint();
+}
+
+function clearMultiSelection() {
+  selectedSeats.clear();
+  document.querySelectorAll(".asiento").forEach(a => {
+    a.classList.remove("multi-selected");
+  });
+  updateMultiSelectUI();
+}
+
+/* =====================
    SESSION & ROLES
 ===================== */
 async function getSession() {
@@ -230,10 +289,11 @@ function applyRole(session) {
 
   app.classList.toggle("readonly", isReadOnly);
   if (hintRO) hintRO.style.display = isReadOnly ? "block" : "none";
-  if (hintSelect) hintSelect.style.display = (!seleccionado && !isReadOnly) ? "block" : "none";
+  if (hintSelect) hintSelect.style.display = (!seleccionado && selectedSeats.size === 0 && !isReadOnly) ? "block" : "none";
 
-  btnGuardar.disabled = isReadOnly || !seleccionado;
-  btnLiberar.disabled = isReadOnly || !seleccionado;
+  const hasSelection = seleccionado || selectedSeats.size > 0;
+  btnGuardar.disabled = isReadOnly || !hasSelection;
+  btnLiberar.disabled = isReadOnly || !hasSelection;
   btnNuevo.disabled = isReadOnly;
 
   fields.forEach(f => {
@@ -257,15 +317,25 @@ function actualizarHint() {
     hintSelect.style.display = "none";
     return;
   }
-  hintSelect.style.display = seleccionado ? "none" : "block";
-  btnGuardar.disabled = !seleccionado;
-  btnLiberar.disabled = !seleccionado;
-  btnGuardar.style.opacity = seleccionado ? "1" : ".55";
-  btnLiberar.style.opacity = seleccionado ? "1" : ".55";
+  const hasSelection = seleccionado || selectedSeats.size > 0;
+  hintSelect.style.display = hasSelection ? "none" : "block";
+  btnGuardar.disabled = !hasSelection;
+  btnLiberar.disabled = !hasSelection;
+  btnGuardar.style.opacity = hasSelection ? "1" : ".55";
+  btnLiberar.style.opacity = hasSelection ? "1" : ".55";
 }
 
 function applySeatFormLock() {
   if (isReadOnly) return;
+
+  // En modo multi-select, no bloquear campos
+  if (selectedSeats.size > 0) {
+    fields.forEach(f => {
+      const el = document.getElementById(f);
+      if (el) el.disabled = false;
+    });
+    return;
+  }
 
   const estadoActual = normalizeEstado(data[seleccionado]?.estadoPago || "libre");
   const isBloqueo = (estadoActual === "bloqueo");
@@ -374,7 +444,15 @@ function crearAsiento(id) {
     seat.classList.add("disabled");
   }
 
-  seat.onclick = () => selectSeat(id, seat);
+  // Marcar como seleccionado si está en la lista
+  if (selectedSeats.has(id)) {
+    seat.classList.add("multi-selected");
+  }
+  if (seleccionado === id && selectedSeats.size === 0) {
+    seat.classList.add("seleccionado");
+  }
+
+  seat.onclick = (e) => selectSeat(id, seat, e);
   seat.setAttribute("role", "button");
   seat.setAttribute("tabindex", visible ? "0" : "-1");
   seat.setAttribute("aria-label", `Asiento ${id}: ${estadoLabel(estado)} - ${info.nombre || "Disponible"}`);
@@ -408,23 +486,71 @@ function render() {
   actualizarHint();
 }
 
-function selectSeat(id, el) {
-  document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
+function selectSeat(id, el, event) {
+  // Detectar si se presionó Ctrl/Cmd para selección múltiple
+  const isMultiSelectKey = event?.ctrlKey || event?.metaKey;
+  
+  if (isMultiSelectKey) {
+    // Modo selección múltiple
+    if (selectedSeats.has(id)) {
+      // Deseleccionar
+      selectedSeats.delete(id);
+      el.classList.remove("multi-selected");
+    } else {
+      // Seleccionar
+      selectedSeats.add(id);
+      el.classList.add("multi-selected");
+    }
+    
+    // Limpiar selección individual si existe
+    if (seleccionado) {
+      seleccionado = null;
+      seatLabel.textContent = "—";
+      document.querySelectorAll(".asiento.seleccionado").forEach(a => {
+        if (!selectedSeats.has(a.textContent.match(/\d+[A-F]/)?.[0])) {
+          a.classList.remove("seleccionado");
+        }
+      });
+    }
+    
+    // Si solo hay un asiento seleccionado, cargar sus datos
+    if (selectedSeats.size === 1) {
+      const singleSeat = Array.from(selectedSeats)[0];
+      fields.forEach(f => {
+        const input = document.getElementById(f);
+        if (!input) return;
+        if (f === "estadoPago") input.value = normalizeEstado(data[singleSeat]?.[f] ?? "libre");
+        else input.value = data[singleSeat]?.[f] ?? "";
+      });
+    } else if (selectedSeats.size === 0) {
+      limpiarFormulario();
+    }
+    
+    updateMultiSelectUI();
+  } else {
+    // Modo selección individual (comportamiento original)
+    // Limpiar selección múltiple si existe
+    if (selectedSeats.size > 0) {
+      clearMultiSelection();
+    }
+    
+    document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
 
-  seleccionado = id;
-  el.classList.add("seleccionado");
-  el.focus();
-  seatLabel.textContent = id;
+    seleccionado = id;
+    el.classList.add("seleccionado");
+    el.focus();
+    seatLabel.textContent = id;
 
-  fields.forEach(f => {
-    const input = document.getElementById(f);
-    if (!input) return;
-    if (f === "estadoPago") input.value = normalizeEstado(data[id]?.[f] ?? "libre");
-    else input.value = data[id]?.[f] ?? "";
-  });
+    fields.forEach(f => {
+      const input = document.getElementById(f);
+      if (!input) return;
+      if (f === "estadoPago") input.value = normalizeEstado(data[id]?.[f] ?? "libre");
+      else input.value = data[id]?.[f] ?? "";
+    });
 
-  applySeatFormLock();
-  actualizarHint();
+    applySeatFormLock();
+    actualizarHint();
+  }
 }
 
 /* =====================
@@ -470,7 +596,13 @@ async function guardarEnSupabase() {
   if (isReadOnly) return alert("❌ Este usuario es solo lectura.");
   const session = await getSession();
   if (!session) return alert("❌ Debes iniciar sesión.");
-  if (!seleccionado) return alert("❌ Selecciona un asiento");
+  
+  // Determinar qué asientos guardar
+  const seatsToSave = selectedSeats.size > 0 
+    ? Array.from(selectedSeats) 
+    : (seleccionado ? [seleccionado] : []);
+  
+  if (seatsToSave.length === 0) return alert("❌ Selecciona al menos un asiento");
 
   // Validar
   const errors = validateForm();
@@ -479,77 +611,100 @@ async function guardarEnSupabase() {
     return;
   }
 
+  // Confirmar si es multi-selección
+  if (seatsToSave.length > 1) {
+    const confirm = window.confirm(
+      `¿Guardar la misma información en ${seatsToSave.length} asientos?\n\n` +
+      `Asientos: ${seatsToSave.sort((a, b) => {
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (numA !== numB) return numA - numB;
+        return a.localeCompare(b);
+      }).join(", ")}`
+    );
+    if (!confirm) return;
+  }
+
   showLoader(saveLoader, true);
 
   try {
-    const payload = { asiento: seleccionado };
-
+    // Preparar payload base
+    const basePayload = {};
     fields.forEach(f => {
       const el = document.getElementById(f);
-      payload[f] = el ? (el.value || null) : null;
+      basePayload[f] = el ? (el.value || null) : null;
     });
 
     // Precio a número
-    if (payload.precio !== null && payload.precio !== "") {
-      const n = Number(payload.precio);
-      payload.precio = Number.isFinite(n) ? n : null;
+    if (basePayload.precio !== null && basePayload.precio !== "") {
+      const n = Number(basePayload.precio);
+      basePayload.precio = Number.isFinite(n) ? n : null;
     } else {
-      payload.precio = null;
+      basePayload.precio = null;
     }
 
     // Default HOLD
-    if (!payload.estadoPago) payload.estadoPago = "hold";
-    payload.estadoPago = normalizeEstado(payload.estadoPago);
+    if (!basePayload.estadoPago) basePayload.estadoPago = "hold";
+    basePayload.estadoPago = normalizeEstado(basePayload.estadoPago);
 
-    // Auditoría - REMOVIDA para ahorrar espacio en BD
-    // payload.updated_at = new Date().toISOString();
-    // payload.updated_by = session.user.email;
+    // Guardar cada asiento
+    const promises = seatsToSave.map(async (seatId) => {
+      const payload = { ...basePayload, asiento: seatId };
+      return db.from(getTableName()).upsert(payload).select().single();
+    });
 
-    // Detección de conflictos - REMOVIDA (requería auditoría)
-    // const lastSync = lastSyncTime[seleccionado];
-    // if (lastSync && data[seleccionado]?.updated_at > lastSync) {
-    //   showConflictModal(seleccionado);
-    //   showLoader(saveLoader, false);
-    //   return;
-    // }
+    const results = await Promise.all(promises);
 
-    const res = await db.from(getTableName()).upsert(payload).select().single();
-    if (res.error) {
-      console.error("❌ Error guardando:", res.error);
-      alert("Error guardando: " + res.error.message);
+    // Verificar errores
+    const hasError = results.some(res => res.error);
+    if (hasError) {
+      const errorMsg = results.find(res => res.error)?.error.message;
+      console.error("❌ Error guardando:", errorMsg);
+      alert("Error guardando: " + errorMsg);
       showLoader(saveLoader, false);
       return;
     }
 
-    res.data.estadoPago = normalizeEstado(res.data.estadoPago);
-    data[seleccionado] = res.data;
+    // Actualizar data local
+    results.forEach(res => {
+      if (res.data) {
+        res.data.estadoPago = normalizeEstado(res.data.estadoPago);
+        data[res.data.asiento] = res.data;
+      }
+    });
 
     // Feedback visual
     const savedAlert = document.createElement("div");
-    savedAlert.textContent = "✅ Guardado exitosamente";
+    savedAlert.textContent = seatsToSave.length === 1 
+      ? "✅ Guardado exitosamente"
+      : `✅ ${seatsToSave.length} asientos guardados exitosamente`;
     savedAlert.style.cssText = "position:fixed;top:20px;right:20px;background:#22c55e;color:white;padding:12px 16px;border-radius:8px;z-index:1001;animation:slideUp 0.3s ease-out;";
     document.body.appendChild(savedAlert);
     setTimeout(() => savedAlert.remove(), 3000);
 
     render();
     
-    // Re-seleccionar el asiento después de renderizar por ID único
-    if (seleccionado) {
-      // Buscar el asiento nuevo por su ID que está en el contenedor
-      const asientos = document.querySelectorAll(".asiento");
-      let encontrado = null;
-      
-      for (let seat of asientos) {
-        // El ID del asiento está en el text content del .top span
-        if (seat.textContent.includes(seleccionado)) {
-          encontrado = seat;
-          break;
-        }
-      }
-      
-      if (encontrado) {
-        selectSeat(seleccionado, encontrado);
-      }
+    // Re-seleccionar asientos después de renderizar
+    if (selectedSeats.size > 0) {
+      setTimeout(() => {
+        selectedSeats.forEach(seatId => {
+          const asientos = document.querySelectorAll(".asiento");
+          asientos.forEach(seat => {
+            if (seat.textContent.includes(seatId)) {
+              seat.classList.add("multi-selected");
+            }
+          });
+        });
+      }, 100);
+    } else if (seleccionado) {
+      setTimeout(() => {
+        const asientos = document.querySelectorAll(".asiento");
+        asientos.forEach(seat => {
+          if (seat.textContent.includes(seleccionado)) {
+            seat.classList.add("seleccionado");
+          }
+        });
+      }, 100);
     }
   } catch (err) {
     console.error("❌ Error:", err);
@@ -563,28 +718,60 @@ async function liberarEnSupabase() {
   if (isReadOnly) return alert("❌ Este usuario es solo lectura.");
   const session = await getSession();
   if (!session) return alert("❌ Debes iniciar sesión.");
-  if (!seleccionado) return;
-  if (!confirm(`¿Liberar el asiento ${seleccionado}?`)) return;
+  
+  // Determinar qué asientos liberar
+  const seatsToFree = selectedSeats.size > 0 
+    ? Array.from(selectedSeats) 
+    : (seleccionado ? [seleccionado] : []);
+  
+  if (seatsToFree.length === 0) return;
+
+  const confirmMsg = seatsToFree.length === 1
+    ? `¿Liberar el asiento ${seatsToFree[0]}?`
+    : `¿Liberar ${seatsToFree.length} asientos?\n\n${seatsToFree.sort((a, b) => {
+        const numA = parseInt(a);
+        const numB = parseInt(b);
+        if (numA !== numB) return numA - numB;
+        return a.localeCompare(b);
+      }).join(", ")}`;
+  
+  if (!confirm(confirmMsg)) return;
 
   showLoader(releaseLoader, true);
 
   try {
-    const res = await db.from(getTableName()).delete().eq("asiento", seleccionado);
-    if (res.error) {
-      console.error("❌ Error liberando:", res.error);
-      alert("Error liberando: " + res.error.message);
+    // Liberar cada asiento
+    const promises = seatsToFree.map(seatId => 
+      db.from(getTableName()).delete().eq("asiento", seatId)
+    );
+
+    const results = await Promise.all(promises);
+
+    // Verificar errores
+    const hasError = results.some(res => res.error);
+    if (hasError) {
+      const errorMsg = results.find(res => res.error)?.error.message;
+      console.error("❌ Error liberando:", errorMsg);
+      alert("Error liberando: " + errorMsg);
       showLoader(releaseLoader, false);
       return;
     }
 
-    delete data[seleccionado];
+    // Actualizar data local
+    seatsToFree.forEach(seatId => {
+      delete data[seatId];
+    });
+
     limpiarFormulario();
     seatLabel.textContent = "–";
     seleccionado = null;
+    clearMultiSelection();
 
     // Feedback visual
     const freedAlert = document.createElement("div");
-    freedAlert.textContent = "✅ Asiento liberado";
+    freedAlert.textContent = seatsToFree.length === 1
+      ? "✅ Asiento liberado"
+      : `✅ ${seatsToFree.length} asientos liberados`;
     freedAlert.style.cssText = "position:fixed;top:20px;right:20px;background:#22c55e;color:white;padding:12px 16px;border-radius:8px;z-index:1001;animation:slideUp 0.3s ease-out;";
     document.body.appendChild(freedAlert);
     setTimeout(() => freedAlert.remove(), 3000);
@@ -669,6 +856,7 @@ btnLogout.addEventListener("click", async () => {
   if (matchSelect) matchSelect.value = "";
   applyMatchTitle();
   seleccionado = null;
+  clearMultiSelection();
   isReadOnly = false;
   app.classList.remove("readonly");
   setMode(false);
@@ -682,7 +870,11 @@ btnLiberar.addEventListener("click", liberarEnSupabase);
 btnNuevo.addEventListener("click", () => {
   if (isReadOnly) return;
   seleccionado = null;
-  document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
+  clearMultiSelection();
+  document.querySelectorAll(".asiento").forEach(a => {
+    a.classList.remove("seleccionado");
+    a.classList.remove("multi-selected");
+  });
   seatLabel.textContent = "–";
   limpiarFormulario();
   if (hintRO) hintRO.style.display = "none";
@@ -691,6 +883,11 @@ btnNuevo.addEventListener("click", () => {
     if (el2) el2.disabled = false;
   });
   actualizarHint();
+});
+
+btnClearMulti.addEventListener("click", () => {
+  clearMultiSelection();
+  limpiarFormulario();
 });
 
 searchInput.addEventListener("input", (e) => {
@@ -718,7 +915,10 @@ btnCSV.addEventListener("click", exportCSV);
 // Naveg con teclado
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (seleccionado) {
+    if (selectedSeats.size > 0) {
+      clearMultiSelection();
+      limpiarFormulario();
+    } else if (seleccionado) {
       seleccionado = null;
       document.querySelectorAll(".asiento").forEach(a => a.classList.remove("seleccionado"));
       limpiarFormulario();
