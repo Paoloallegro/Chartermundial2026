@@ -7,6 +7,15 @@ const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // ⚠️ IMPORTANTE: En producción, nunca hardcodees credenciales.
 // Usa un backend seguro o variables de entorno.
 
+// ⚙️ PARTIDO POR DEFECTO: Panamá vs Inglaterra
+const DEFAULT_MATCH = "PA-EN";
+
+// ⏱️ CONFIGURACIÓN DE AUTO-LOGOUT
+const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutos en milisegundos
+const WARNING_TIME = 2 * 60 * 1000; // Advertencia 2 minutos antes
+const LOGOUT_ON_CLOSE = true; // Cerrar sesión al cerrar pestaña/navegador
+const SESSION_KEY = "app_session_active"; // Clave para detectar sesión activa
+
 if (!window.supabase) {
   alert("❌ No se cargó el SDK de Supabase. Revisa el script src.");
 }
@@ -47,7 +56,6 @@ const loginForm = document.getElementById("loginForm");
 const app = document.getElementById("app");
 const loginEmail = document.getElementById("loginEmail");
 const loginPass = document.getElementById("loginPass");
-const matchSelect = document.getElementById("matchSelect");
 const btnLogin = document.getElementById("btnLogin");
 const loginLoader = document.getElementById("loginLoader");
 const authError = document.getElementById("authError");
@@ -92,12 +100,221 @@ const btnClearMulti = document.getElementById("btnClearMulti");
    STATE
 ===================== */
 let seleccionado = null;
-let selectedSeats = new Set(); // Para selección múltiple
+let selectedSeats = new Set();
 let data = {};
 let filterEstado = "todos";
 let searchText = "";
 let isReadOnly = false;
 let currentSession = null;
+
+// Estado de auto-logout
+let inactivityTimer = null;
+let warningTimer = null;
+let warningModal = null;
+
+/* =====================
+   SESSION PERSISTENCE CONTROL
+===================== */
+
+// Marcar que la sesión está activa (usar sessionStorage)
+function markSessionActive() {
+  if (LOGOUT_ON_CLOSE) {
+    // sessionStorage se borra al cerrar la pestaña/navegador
+    sessionStorage.setItem(SESSION_KEY, "true");
+  }
+}
+
+// Verificar si la sesión debe estar activa
+function shouldSessionBeActive() {
+  if (!LOGOUT_ON_CLOSE) return true;
+  // Si no existe la marca en sessionStorage, la pestaña fue cerrada
+  return sessionStorage.getItem(SESSION_KEY) === "true";
+}
+
+// Limpiar marca de sesión activa
+function clearSessionMark() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+/* =====================
+   AUTO-LOGOUT SYSTEM
+===================== */
+function resetInactivityTimer() {
+  // Limpiar timers existentes
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  if (warningTimer) clearTimeout(warningTimer);
+  if (warningModal) closeWarningModal();
+
+  // Solo configurar si hay sesión activa
+  const hasSession = app.style.display !== "none";
+  if (!hasSession) return;
+
+  // Timer para mostrar advertencia
+  warningTimer = setTimeout(() => {
+    showWarningModal();
+  }, INACTIVITY_TIMEOUT - WARNING_TIME);
+
+  // Timer para logout automático
+  inactivityTimer = setTimeout(() => {
+    autoLogout("inactividad");
+  }, INACTIVITY_TIMEOUT);
+}
+
+function showWarningModal() {
+  // Crear modal de advertencia
+  warningModal = document.createElement("div");
+  warningModal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.3s ease-out;
+  `;
+
+  const modalContent = document.createElement("div");
+  modalContent.style.cssText = `
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease-out;
+  `;
+
+  let countdown = Math.floor(WARNING_TIME / 1000); // segundos
+  
+  modalContent.innerHTML = `
+    <div style="font-size: 48px; margin-bottom: 16px;">⏰</div>
+    <h2 style="margin: 0 0 12px 0; font-size: 22px; color: #0f172a;">Sesión por Expirar</h2>
+    <p style="color: #64748b; margin-bottom: 24px;">
+      Tu sesión se cerrará en <strong id="countdown">${countdown}</strong> segundos por inactividad.
+    </p>
+    <button id="btnStayActive" style="
+      background: linear-gradient(90deg, #3b82f6, #06b6d4);
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 15px;
+      transition: all 0.2s;
+    " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 16px rgba(59, 130, 246, 0.3)';" onmouseout="this.style.transform=''; this.style.boxShadow='';">
+      Seguir Activo
+    </button>
+  `;
+
+  warningModal.appendChild(modalContent);
+  document.body.appendChild(warningModal);
+
+  // Countdown
+  const countdownEl = document.getElementById("countdown");
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    if (countdownEl) countdownEl.textContent = countdown;
+    if (countdown <= 0) clearInterval(countdownInterval);
+  }, 1000);
+
+  // Botón para mantenerse activo
+  document.getElementById("btnStayActive").onclick = () => {
+    clearInterval(countdownInterval);
+    closeWarningModal();
+    resetInactivityTimer();
+  };
+}
+
+function closeWarningModal() {
+  if (warningModal) {
+    warningModal.remove();
+    warningModal = null;
+  }
+}
+
+async function autoLogout(reason = "inactividad") {
+  closeWarningModal();
+  
+  // Mostrar mensaje
+  const logoutMsg = document.createElement("div");
+  logoutMsg.textContent = reason === "inactividad" 
+    ? "⏰ Sesión cerrada por inactividad" 
+    : "👋 Sesión cerrada";
+  logoutMsg.style.cssText = "position:fixed;top:20px;right:20px;background:#ef4444;color:white;padding:12px 16px;border-radius:8px;z-index:10000;animation:slideUp 0.3s ease-out;";
+  document.body.appendChild(logoutMsg);
+  
+  setTimeout(() => logoutMsg.remove(), 3000);
+
+  // Cerrar sesión
+  await performLogout();
+}
+
+async function performLogout() {
+  // Cerrar sesión en Supabase
+  await db.auth.signOut();
+  
+  // Limpiar todo el estado
+  sessionStorage.clear();
+  localStorage.removeItem('supabase.auth.token'); // Limpiar token de Supabase
+  
+  applyMatchTitle();
+  seleccionado = null;
+  clearMultiSelection();
+  isReadOnly = false;
+  app.classList.remove("readonly");
+  setMode(false);
+  limpiarFormulario();
+  data = {};
+  
+  // Limpiar timers
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  if (warningTimer) clearTimeout(warningTimer);
+  closeWarningModal();
+}
+
+// Detectar actividad del usuario
+function setupActivityListeners() {
+  const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+  
+  events.forEach(event => {
+    document.addEventListener(event, () => {
+      resetInactivityTimer();
+    }, true);
+  });
+}
+
+// Cerrar sesión al cerrar pestaña/navegador usando beforeunload
+if (LOGOUT_ON_CLOSE) {
+  window.addEventListener('beforeunload', (e) => {
+    const hasSession = app.style.display !== "none";
+    if (hasSession) {
+      // Limpiar la marca de sesión activa
+      clearSessionMark();
+    }
+  });
+
+  // Para navegadores móviles y Safari
+  window.addEventListener('pagehide', (e) => {
+    const hasSession = app.style.display !== "none";
+    if (hasSession) {
+      clearSessionMark();
+    }
+  });
+
+  // Al enfocar la ventana, verificar si la sesión sigue válida
+  window.addEventListener('focus', async () => {
+    const { data: session } = await db.auth.getSession();
+    if (session.session && !shouldSessionBeActive()) {
+      // La pestaña fue cerrada y reabierta, cerrar sesión
+      await performLogout();
+    }
+  });
+}
 
 /* =====================
    HELPERS: ESTADO
@@ -126,25 +343,20 @@ function validateField(fieldName, value) {
   const rule = VALIDATION_RULES[fieldName];
   if (!rule) return { valid: true };
 
-  // Requerido
   if (rule.required && !value) {
     return { valid: false, message: `${fieldName} es requerido` };
   }
 
-  // Vacío permitido si no es requerido
   if (!value) return { valid: true };
 
-  // Máximo de caracteres
   if (rule.maxLength && value.length > rule.maxLength) {
     return { valid: false, message: `${fieldName} no puede exceder ${rule.maxLength} caracteres` };
   }
 
-  // Pattern
   if (rule.pattern && !rule.pattern.test(value)) {
     return { valid: false, message: `${fieldName} tiene formato inválido` };
   }
 
-  // Email
   if (rule.type === "email" && value) {
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(value)) {
@@ -152,14 +364,12 @@ function validateField(fieldName, value) {
     }
   }
 
-  // Date
   if (rule.type === "date" && value) {
     if (isNaN(Date.parse(value))) {
       return { valid: false, message: "Fecha inválida" };
     }
   }
 
-  // Número
   if (typeof rule.min !== "undefined" || typeof rule.max !== "undefined") {
     const num = Number(value);
     if (isNaN(num)) {
@@ -200,6 +410,17 @@ function showError(msg) {
 function setMode(logged) {
   loginScreen.style.display = logged ? "none" : "flex";
   app.style.display = logged ? "grid" : "none";
+  
+  // Iniciar/detener timers de inactividad
+  if (logged) {
+    markSessionActive(); // Marcar sesión como activa
+    resetInactivityTimer();
+  } else {
+    clearSessionMark(); // Limpiar marca de sesión
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    if (warningTimer) clearTimeout(warningTimer);
+    closeWarningModal();
+  }
 }
 
 function showLoader(loader, show = true) {
@@ -211,15 +432,11 @@ function showLoadingSpinner(show = true) {
 }
 
 function applyMatchTitle() {
-  const v = sessionStorage.getItem("match") || "";
-  if (v === "PA-EN") matchTitle.textContent = "PANAMÁ VS INGLATERRA";
-  else if (v === "PA-GH") matchTitle.textContent = "PANAMÁ VS GHANA";
-  else matchTitle.textContent = "CHARTER";
+  matchTitle.textContent = "PANAMÁ VS INGLATERRA";
 }
 
 function getTableName() {
-  const m = sessionStorage.getItem("match") || "";
-  return (m === "PA-GH") ? "asientos_ghana" : "asientos";
+  return "asientos";
 }
 
 /* =====================
@@ -229,17 +446,14 @@ function updateMultiSelectUI() {
   const isMulti = selectedSeats.size > 0;
   
   if (isMulti) {
-    // Mostrar badge de selección múltiple
     multiSelectBadge.style.display = "block";
     multiCount.textContent = selectedSeats.size;
     multiSeatLabel.style.display = "block";
     singleSeatLabel.style.display = "none";
     
-    // Actualizar texto de botones
     btnGuardarText.textContent = `💾 Guardar en ${selectedSeats.size} asiento(s)`;
     btnLiberarText.textContent = `🗑 Liberar ${selectedSeats.size} asiento(s)`;
     
-    // Mostrar chips de asientos seleccionados
     selectedSeatsDisplay.innerHTML = "";
     const sortedSeats = Array.from(selectedSeats).sort((a, b) => {
       const numA = parseInt(a);
@@ -255,7 +469,6 @@ function updateMultiSelectUI() {
       selectedSeatsDisplay.appendChild(chip);
     });
   } else {
-    // Modo selección individual
     multiSelectBadge.style.display = "none";
     multiSeatLabel.style.display = "none";
     singleSeatLabel.style.display = "block";
@@ -328,7 +541,6 @@ function actualizarHint() {
 function applySeatFormLock() {
   if (isReadOnly) return;
 
-  // En modo multi-select, no bloquear campos
   if (selectedSeats.size > 0) {
     fields.forEach(f => {
       const el = document.getElementById(f);
@@ -347,7 +559,7 @@ function applySeatFormLock() {
   });
 
   const ep = document.getElementById("estadoPago");
-  if (ep) ep.disabled = false; // siempre permite cambiar estado
+  if (ep) ep.disabled = false;
   
   if (hintRO) hintRO.style.display = isBloqueo ? "block" : "none";
 }
@@ -444,7 +656,6 @@ function crearAsiento(id) {
     seat.classList.add("disabled");
   }
 
-  // Marcar como seleccionado si está en la lista
   if (selectedSeats.has(id)) {
     seat.classList.add("multi-selected");
   }
@@ -487,22 +698,17 @@ function render() {
 }
 
 function selectSeat(id, el, event) {
-  // Detectar si se presionó Ctrl/Cmd para selección múltiple
   const isMultiSelectKey = event?.ctrlKey || event?.metaKey;
   
   if (isMultiSelectKey) {
-    // Modo selección múltiple
     if (selectedSeats.has(id)) {
-      // Deseleccionar
       selectedSeats.delete(id);
       el.classList.remove("multi-selected");
     } else {
-      // Seleccionar
       selectedSeats.add(id);
       el.classList.add("multi-selected");
     }
     
-    // Limpiar selección individual si existe
     if (seleccionado) {
       seleccionado = null;
       seatLabel.textContent = "—";
@@ -513,7 +719,6 @@ function selectSeat(id, el, event) {
       });
     }
     
-    // Si solo hay un asiento seleccionado, cargar sus datos
     if (selectedSeats.size === 1) {
       const singleSeat = Array.from(selectedSeats)[0];
       fields.forEach(f => {
@@ -528,8 +733,6 @@ function selectSeat(id, el, event) {
     
     updateMultiSelectUI();
   } else {
-    // Modo selección individual (comportamiento original)
-    // Limpiar selección múltiple si existe
     if (selectedSeats.size > 0) {
       clearMultiSelection();
     }
@@ -597,21 +800,18 @@ async function guardarEnSupabase() {
   const session = await getSession();
   if (!session) return alert("❌ Debes iniciar sesión.");
   
-  // Determinar qué asientos guardar
   const seatsToSave = selectedSeats.size > 0 
     ? Array.from(selectedSeats) 
     : (seleccionado ? [seleccionado] : []);
   
   if (seatsToSave.length === 0) return alert("❌ Selecciona al menos un asiento");
 
-  // Validar
   const errors = validateForm();
   if (errors.length > 0) {
     alert("❌ Errores de validación:\n" + errors.join("\n"));
     return;
   }
 
-  // Confirmar si es multi-selección
   if (seatsToSave.length > 1) {
     const confirm = window.confirm(
       `¿Guardar la misma información en ${seatsToSave.length} asientos?\n\n` +
@@ -628,14 +828,12 @@ async function guardarEnSupabase() {
   showLoader(saveLoader, true);
 
   try {
-    // Preparar payload base
     const basePayload = {};
     fields.forEach(f => {
       const el = document.getElementById(f);
       basePayload[f] = el ? (el.value || null) : null;
     });
 
-    // Precio a número
     if (basePayload.precio !== null && basePayload.precio !== "") {
       const n = Number(basePayload.precio);
       basePayload.precio = Number.isFinite(n) ? n : null;
@@ -643,11 +841,9 @@ async function guardarEnSupabase() {
       basePayload.precio = null;
     }
 
-    // Default HOLD
     if (!basePayload.estadoPago) basePayload.estadoPago = "hold";
     basePayload.estadoPago = normalizeEstado(basePayload.estadoPago);
 
-    // Guardar cada asiento
     const promises = seatsToSave.map(async (seatId) => {
       const payload = { ...basePayload, asiento: seatId };
       return db.from(getTableName()).upsert(payload).select().single();
@@ -655,7 +851,6 @@ async function guardarEnSupabase() {
 
     const results = await Promise.all(promises);
 
-    // Verificar errores
     const hasError = results.some(res => res.error);
     if (hasError) {
       const errorMsg = results.find(res => res.error)?.error.message;
@@ -665,7 +860,6 @@ async function guardarEnSupabase() {
       return;
     }
 
-    // Actualizar data local
     results.forEach(res => {
       if (res.data) {
         res.data.estadoPago = normalizeEstado(res.data.estadoPago);
@@ -673,7 +867,6 @@ async function guardarEnSupabase() {
       }
     });
 
-    // Feedback visual
     const savedAlert = document.createElement("div");
     savedAlert.textContent = seatsToSave.length === 1 
       ? "✅ Guardado exitosamente"
@@ -684,7 +877,6 @@ async function guardarEnSupabase() {
 
     render();
     
-    // Re-seleccionar asientos después de renderizar
     if (selectedSeats.size > 0) {
       setTimeout(() => {
         selectedSeats.forEach(seatId => {
@@ -719,7 +911,6 @@ async function liberarEnSupabase() {
   const session = await getSession();
   if (!session) return alert("❌ Debes iniciar sesión.");
   
-  // Determinar qué asientos liberar
   const seatsToFree = selectedSeats.size > 0 
     ? Array.from(selectedSeats) 
     : (seleccionado ? [seleccionado] : []);
@@ -740,14 +931,12 @@ async function liberarEnSupabase() {
   showLoader(releaseLoader, true);
 
   try {
-    // Liberar cada asiento
     const promises = seatsToFree.map(seatId => 
       db.from(getTableName()).delete().eq("asiento", seatId)
     );
 
     const results = await Promise.all(promises);
 
-    // Verificar errores
     const hasError = results.some(res => res.error);
     if (hasError) {
       const errorMsg = results.find(res => res.error)?.error.message;
@@ -757,7 +946,6 @@ async function liberarEnSupabase() {
       return;
     }
 
-    // Actualizar data local
     seatsToFree.forEach(seatId => {
       delete data[seatId];
     });
@@ -767,7 +955,6 @@ async function liberarEnSupabase() {
     seleccionado = null;
     clearMultiSelection();
 
-    // Feedback visual
     const freedAlert = document.createElement("div");
     freedAlert.textContent = seatsToFree.length === 1
       ? "✅ Asiento liberado"
@@ -822,13 +1009,10 @@ async function handleLogin(e) {
 
   if (!email || !password) return showError("❌ Completa email y contraseña.");
 
-  const match = (matchSelect?.value || "").trim();
-  if (!match) return showError("❌ Selecciona el partido.");
-
   showLoader(loginLoader, true);
 
   try {
-    sessionStorage.setItem("match", match);
+    sessionStorage.setItem("match", DEFAULT_MATCH);
 
     const { data: auth, error } = await db.auth.signInWithPassword({ email, password });
     if (error) return showError("❌ " + error.message);
@@ -838,7 +1022,6 @@ async function handleLogin(e) {
     applyRole(auth.session);
     await cargarDesdeSupabase();
 
-    // Limpiar form
     loginForm.reset();
   } catch (err) {
     console.error("❌ Error:", err);
@@ -849,19 +1032,7 @@ async function handleLogin(e) {
 }
 
 btnLogout.addEventListener("click", async () => {
-  await db.auth.signOut();
-  sessionStorage.removeItem("match");
-  sessionStorage.removeItem("filter");
-  sessionStorage.removeItem("search");
-  if (matchSelect) matchSelect.value = "";
-  applyMatchTitle();
-  seleccionado = null;
-  clearMultiSelection();
-  isReadOnly = false;
-  app.classList.remove("readonly");
-  setMode(false);
-  limpiarFormulario();
-  data = {};
+  await performLogout();
 });
 
 btnGuardar.addEventListener("click", guardarEnSupabase);
@@ -912,7 +1083,6 @@ chips.forEach(chip => {
 
 btnCSV.addEventListener("click", exportCSV);
 
-// Naveg con teclado
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (selectedSeats.size > 0) {
@@ -932,22 +1102,37 @@ document.addEventListener("keydown", (e) => {
 ===================== */
 (async () => {
   try {
+    if (!sessionStorage.getItem("match")) {
+      sessionStorage.setItem("match", DEFAULT_MATCH);
+    }
+
     const { data: s } = await db.auth.getSession();
     const logged = !!s.session;
+
+    // Verificar si la sesión debería estar activa
+    if (logged && LOGOUT_ON_CLOSE && !shouldSessionBeActive()) {
+      // La pestaña fue cerrada previamente, cerrar sesión
+      await performLogout();
+      return;
+    }
 
     setMode(logged);
     render();
 
     if (logged) {
+      applyMatchTitle();
       applyRole(s.session);
       await cargarDesdeSupabase();
+      setupActivityListeners();
     }
 
     db.auth.onAuthStateChange((_event, session) => {
       setMode(!!session);
       if (session) {
+        applyMatchTitle();
         applyRole(session);
         cargarDesdeSupabase();
+        setupActivityListeners();
       }
     });
 
@@ -956,11 +1141,3 @@ document.addEventListener("keydown", (e) => {
     console.error("❌ Init error:", err);
   }
 })();
-
-/* =====================
-   SERVICE WORKER (opcional para PWA)
-===================== */
-if ("serviceWorker" in navigator) {
-  // Descomenta si implementas un service worker
-  // navigator.serviceWorker.register("/sw.js").catch(e => console.log("SW error:", e));
-}
