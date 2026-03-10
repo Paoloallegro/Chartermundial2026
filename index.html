@@ -18,7 +18,7 @@
   <div class="auth-card">
     <div class="auth-brand">
       <div class="auth-title">Mapa de Asientos</div>
-      <div class="auth-subtitle">Panamá VS Inglaterra</div>
+      <div class="auth-subtitle">Sistema de gestión premium</div>
     </div>
 
     <form id="loginForm" onsubmit="handleLogin(event)">
@@ -47,6 +47,18 @@
         aria-required="true"
       />
 
+      <label class="auth-label" for="matchSelect">Selecciona el partido</label>
+      <select 
+        id="matchSelect" 
+        class="auth-input auth-select"
+        required
+        aria-required="true"
+      >
+        <option value="">— Seleccionar —</option>
+        <option value="PA-EN">Panamá VS Inglaterra</option>
+        <option value="PA-GH">Panamá VS Ghana</option>
+      </select>
+
       <button type="submit" id="btnLogin" class="btn primary full" aria-label="Botón para ingresar">
         <span>Entrar</span>
         <div class="loader" id="loginLoader" style="display:none;"></div>
@@ -56,7 +68,7 @@
     <div id="authError" class="auth-error" role="alert" style="display:none;"></div>
 
     <div class="auth-foot">
-      Version 2.7.0 -- 10/02/2026 --
+      Version 2.8.0 · 10/03/2026
     </div>
   </div>
 </section>
@@ -68,7 +80,7 @@
   <section class="seats">
     <header class="topbar" role="banner">
       <div class="brand">
-        <div class="title" id="matchTitle">PANAMÁ VS INGLATERRA</div>
+        <div class="title" id="matchTitle">CHARTER</div>
         <div class="subtitle">Avión 3—3 · 189 puestos</div>
       </div>
 

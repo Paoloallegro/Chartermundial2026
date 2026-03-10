@@ -56,6 +56,7 @@ const loginForm = document.getElementById("loginForm");
 const app = document.getElementById("app");
 const loginEmail = document.getElementById("loginEmail");
 const loginPass = document.getElementById("loginPass");
+const matchSelect = document.getElementById("matchSelect");
 const btnLogin = document.getElementById("btnLogin");
 const loginLoader = document.getElementById("loginLoader");
 const authError = document.getElementById("authError");
@@ -262,6 +263,9 @@ async function performLogout() {
   sessionStorage.clear();
   localStorage.removeItem('supabase.auth.token'); // Limpiar token de Supabase
   
+  // Limpiar selector de partido
+  if (matchSelect) matchSelect.value = "";
+  
   applyMatchTitle();
   seleccionado = null;
   clearMultiSelection();
@@ -432,11 +436,15 @@ function showLoadingSpinner(show = true) {
 }
 
 function applyMatchTitle() {
-  matchTitle.textContent = "PANAMÁ VS INGLATERRA";
+  const v = sessionStorage.getItem("match") || "";
+  if (v === "PA-EN") matchTitle.textContent = "PANAMÁ VS INGLATERRA";
+  else if (v === "PA-GH") matchTitle.textContent = "PANAMÁ VS GHANA";
+  else matchTitle.textContent = "CHARTER";
 }
 
 function getTableName() {
-  return "asientos";
+  const m = sessionStorage.getItem("match") || "";
+  return (m === "PA-GH") ? "asientos_ghana" : "asientos";
 }
 
 /* =====================
@@ -1009,10 +1017,13 @@ async function handleLogin(e) {
 
   if (!email || !password) return showError("❌ Completa email y contraseña.");
 
+  const match = (matchSelect?.value || "").trim();
+  if (!match) return showError("❌ Selecciona el partido.");
+
   showLoader(loginLoader, true);
 
   try {
-    sessionStorage.setItem("match", DEFAULT_MATCH);
+    sessionStorage.setItem("match", match);
 
     const { data: auth, error } = await db.auth.signInWithPassword({ email, password });
     if (error) return showError("❌ " + error.message);
@@ -1102,10 +1113,6 @@ document.addEventListener("keydown", (e) => {
 ===================== */
 (async () => {
   try {
-    if (!sessionStorage.getItem("match")) {
-      sessionStorage.setItem("match", DEFAULT_MATCH);
-    }
-
     const { data: s } = await db.auth.getSession();
     const logged = !!s.session;
 
